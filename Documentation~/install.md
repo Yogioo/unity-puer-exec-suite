@@ -92,6 +92,29 @@ for i in 1 2 3 4 5; do git push origin main && break; sleep 3; done
 
 如果想让 https 走 `gh` 的凭据（不依赖 SSH agent），`gh auth setup-git` 一次即可。
 
+### 如果 DNS 把 github.com 指到了走不通的 IP
+
+先确认是不是这个原因：
+
+```bash
+curl -s -o /dev/null -w "%{http_code} ip=%{remote_ip}
+" https://github.com    # 你的 DNS 给的 IP
+for ip in 140.82.112.3 140.82.114.3 4.237.22.38; do
+  curl -s -o /dev/null --resolve github.com:443:$ip -w "$ip -> %{http_code}
+" https://github.com
+done
+```
+
+若第一条不通、后几条 200，就让 git 绕过 DNS（证书仍按 `github.com` 校验）：
+
+```bash
+git -c http.curloptResolve=github.com:443:140.82.114.3 push origin main
+# 或者长期生效（GitHub 轮换 IP 后会失效，需要更新）
+git config --global http.curloptResolve github.com:443:140.82.114.3
+```
+
+注意 `api.github.com`（gh 用的）和 `github.com` 是两个不同的 IP，所以**gh 命令能通不代表 git 能通**，反之亦然。
+
 ## 装完检查
 
 1. 回到 Unity，等待 import + 编译（首次 1~2 分钟；`PapiV8.dll` 13MB，只是 import 不编译）。
