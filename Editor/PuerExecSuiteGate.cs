@@ -7,14 +7,18 @@ using UnityEngine;
 namespace PuerExecSuite
 {
     /// <summary>
-    /// Per-machine switch for the vendored PuerExec stack.
+    /// Startup switch for the vendored PuerExec stack.
     ///
-    /// The package never starts anything by itself: upstream only opens its control
+    /// Nothing here listens on a port by itself: upstream only opens its control
     /// endpoint when the Editor is launched with <c>-unityPuerExecControl</c> or when a
-    /// human picks the upstream menu action. This gate adds one more layer that is
-    /// local to the machine and never committed: an opt-in marker file under
-    /// <c>UserSettings/</c>. Marker absent means the suite stays silent even when the
-    /// package folder is present.
+    /// human picks the upstream menu action. This gate decides whether to ask upstream
+    /// for that activation on every Editor start, from two files:
+    ///
+    ///   UserSettings/PuerExecSuite/enabled       this machine only, never committed
+    ///   UserSettings/PuerExecSuite/disabled      this machine only, overrides the project file
+    ///   ProjectSettings/PuerExecSuite/enabled    committed on purpose, applies to the team
+    ///
+    /// With none of them present the suite stays silent.
     /// </summary>
     [InitializeOnLoad]
     public static class PuerExecSuiteGate
@@ -25,16 +29,24 @@ namespace PuerExecSuite
 
         public const string UpstreamActivateMenuItem = "Tools/UnityPuerExec/Activate CLI Control (this session)";
 
-        public const string FlagRelativePath = "UserSettings/PuerExecSuite/enabled";
+        public const string MachineEnabledPath = "UserSettings/PuerExecSuite/enabled";
+
+        public const string MachineDisabledPath = "UserSettings/PuerExecSuite/disabled";
+
+        public const string ProjectEnabledPath = "ProjectSettings/PuerExecSuite/enabled";
 
         public const string CliRelativePath =
             "Packages/" + PackageName + "/Vendor/com.txcombo.unity-puer-exec/CLI~/unity-puer-exec.exe";
 
         private const string MenuRoot = "Tools/Puer Exec Suite/";
 
+        private const int MaxActivationAttempts = 20;
+
+        private static bool _warned;
+
         static PuerExecSuiteGate()
         {
-            EditorApplication.delayCall += AutoActivateIfEnabled;
+            EditorApplication.delayCall += () => AutoActivate(0);
         }
 
         public static string ProjectRoot
@@ -46,28 +58,26 @@ namespace PuerExecSuite
             }
         }
 
-        public static string FlagPath
+        public static bool IsEnabled
         {
-            get { return ProjectPath(FlagRelativePath); }
+            get { return EnabledSource != "none"; }
         }
 
-        public static string CliPath
-        {
-            get { return ProjectPath(CliRelativePath); }
-        }
-
-        public static bool IsEnabledOnThisMachine
+        public static string EnabledSource
         {
             get
             {
-                try
+                if (Exists(MachineDisabledPath))
                 {
-                    return File.Exists(FlagPath);
+                    return "none";
                 }
-                catch
+
+                if (Exists(MachineEnabledPath))
                 {
-                    return false;
+                    return "machine";
                 }
+
+                return Exists(ProjectEnabledPath) ? "project" : "none";
             }
         }
 
@@ -76,45 +86,22 @@ namespace PuerExecSuite
             get { return ActivatedByCommandLine() || ActivatedByUpstream(); }
         }
 
-        public static void Enable()
+        public static string CliPath
         {
-            var path = FlagPath;
-            if (string.IsNullOrEmpty(path))
-            {
-                Debug.LogError("[PuerExecSuite] Cannot resolve the project path.");
-                return;
-            }
-
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(path));
-                File.WriteAllText(path, "enabled" + Environment.NewLine);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[PuerExecSuite] Failed to write the opt-in marker: " + ex.Message);
-                return;
-            }
-
-            Debug.Log("[PuerExecSuite] Opt-in marker written: " + path);
-            AutoActivateIfEnabled();
+            get { return ProjectPath(CliRelativePath); }
         }
 
-        public static void Disable()
+        public static void EnableForMachine()
         {
-            var path = FlagPath;
-            try
-            {
-                if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                {
-                    File.Delete(path);
-                    Debug.Log("[PuerExecSuite] Opt-in marker removed: " + path);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[PuerExecSuite] Failed to delete the opt-in marker: " + ex.Message);
-            }
+            WriteFlag(MachineEnabledPath);
+            DeleteFlag(MachineDisabledPath);
+            AutoActivate(0);
+        }
+
+        public static void DisableForMachine()
+        {
+            WriteFlag(MachineDisabledPath);
+            DeleteFlag(MachineEnabledPath);
 
             if (ActivatedByUpstream() && !ActivatedByCommandLine())
             {
@@ -122,32 +109,65 @@ namespace PuerExecSuite
             }
         }
 
-        [MenuItem(MenuRoot + "Enable On This Machine", false, 10)]
-        private static void MenuEnable()
+        public static void EnableForProject()
         {
-            Enable();
+            WriteFlag(ProjectEnabledPath);
+            Debug.Log("[PuerExecSuite] " + ProjectEnabledPath + " written. Commit it to share the opt-in with the team.");
+            AutoActivate(0);
+        }
+
+        public static void DisableForProject()
+        {
+            DeleteFlag(ProjectEnabledPath);
+        }
+
+        [MenuItem(MenuRoot + "Enable On This Machine", false, 10)]
+        private static void MenuEnableForMachine()
+        {
+            EnableForMachine();
         }
 
         [MenuItem(MenuRoot + "Disable On This Machine", false, 11)]
-        private static void MenuDisable()
+        private static void MenuDisableForMachine()
         {
-            Disable();
+            DisableForMachine();
         }
 
-        [MenuItem(MenuRoot + "Status", false, 12)]
+        [MenuItem(MenuRoot + "Enable For This Project (committed)", false, 12)]
+        private static void MenuEnableForProject()
+        {
+            EnableForProject();
+        }
+
+        [MenuItem(MenuRoot + "Disable For This Project (committed)", false, 13)]
+        private static void MenuDisableForProject()
+        {
+            DisableForProject();
+        }
+
+        [MenuItem(MenuRoot + "Status", false, 20)]
         private static void MenuStatus()
         {
             var report = string.Join(
                 Environment.NewLine,
                 "[PuerExecSuite] status",
-                "  project      : " + ProjectRoot,
-                "  opt-in marker: " + FlagPath + (IsEnabledOnThisMachine ? "  (present)" : "  (absent)"),
-                "  endpoint     : " + (IsActive ? "listening" : "not listening"),
-                "  cli          : " + CliPath + (File.Exists(CliPath) ? string.Empty : "  (missing)"));
+                "  project        : " + ProjectRoot,
+                "  enabled source : " + EnabledSource,
+                "  machine marker : " + ProjectPath(MachineEnabledPath) + (Exists(MachineEnabledPath) ? "  (present)" : "  (absent)"),
+                "  machine veto   : " + ProjectPath(MachineDisabledPath) + (Exists(MachineDisabledPath) ? "  (present)" : "  (absent)"),
+                "  project marker : " + ProjectPath(ProjectEnabledPath) + (Exists(ProjectEnabledPath) ? "  (present)" : "  (absent)"),
+                "  endpoint       : " + (IsActive ? "listening" : "not listening"),
+                "  cli            : " + CliPath + (File.Exists(CliPath) ? string.Empty : "  (missing)"));
             Debug.Log(report);
         }
 
-        [MenuItem(MenuRoot + "Reveal CLI", false, 20)]
+        [MenuItem(MenuRoot + "Activate Now (this session)", false, 21)]
+        private static void MenuActivateNow()
+        {
+            AutoActivate(0, true);
+        }
+
+        [MenuItem(MenuRoot + "Reveal CLI", false, 30)]
         private static void MenuRevealCli()
         {
             var cli = CliPath;
@@ -160,10 +180,16 @@ namespace PuerExecSuite
             Debug.LogError("[PuerExecSuite] CLI not found: " + cli);
         }
 
-        private static void AutoActivateIfEnabled()
+        private static void AutoActivate(int attempt, bool force = false)
         {
-            if (!IsEnabledOnThisMachine || IsActive)
+            if (IsActive || (!force && !IsEnabled))
             {
+                return;
+            }
+
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                Retry(attempt);
                 return;
             }
 
@@ -179,9 +205,29 @@ namespace PuerExecSuite
                 return;
             }
 
-            Debug.LogWarning(
-                "[PuerExecSuite] Opt-in marker is present but the upstream activation entry point was not found. "
-                + "Launch the Editor with " + ActivationSwitch + " instead.");
+            if (Retry(attempt))
+            {
+                return;
+            }
+
+            if (!_warned)
+            {
+                _warned = true;
+                Debug.LogWarning(
+                    "[PuerExecSuite] Opt-in is on but the upstream activation entry point was not found. "
+                    + "Launch the Editor with " + ActivationSwitch + " instead.");
+            }
+        }
+
+        private static bool Retry(int attempt)
+        {
+            if (attempt >= MaxActivationAttempts)
+            {
+                return false;
+            }
+
+            EditorApplication.delayCall += () => AutoActivate(attempt + 1);
+            return true;
         }
 
         private static bool ActivatedByCommandLine()
@@ -266,6 +312,57 @@ namespace PuerExecSuite
             }
 
             return null;
+        }
+
+        private static void WriteFlag(string relative)
+        {
+            var path = ProjectPath(relative);
+            if (string.IsNullOrEmpty(path))
+            {
+                Debug.LogError("[PuerExecSuite] Cannot resolve the project path.");
+                return;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, "enabled" + Environment.NewLine);
+                Debug.Log("[PuerExecSuite] marker written: " + path);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[PuerExecSuite] Failed to write " + path + ": " + ex.Message);
+            }
+        }
+
+        private static void DeleteFlag(string relative)
+        {
+            var path = ProjectPath(relative);
+            try
+            {
+                if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                {
+                    File.Delete(path);
+                    Debug.Log("[PuerExecSuite] marker removed: " + path);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[PuerExecSuite] Failed to delete " + path + ": " + ex.Message);
+            }
+        }
+
+        private static bool Exists(string relative)
+        {
+            try
+            {
+                var path = ProjectPath(relative);
+                return !string.IsNullOrEmpty(path) && File.Exists(path);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static string ProjectPath(string relative)

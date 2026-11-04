@@ -66,12 +66,22 @@ Unity 的 embedded package 机制会自动识别 `Packages/<带 package.json 的
 | 层 | 状态 | 怎么开 |
 | --- | --- | --- |
 | 1. 包在不在 | 不在就完全不参与编译 | 删掉 `Packages/com.yogioo.puer-exec-suite`，或 `install.ps1 -Remove` |
-| 2. 本机是否允许激活 | `UserSettings/PuerExecSuite/enabled` 不存在 = 不激活 | 菜单 `Tools/Puer Exec Suite/Enable On This Machine`（`UserSettings/` 是 Unity 默认 gitignore 的本机目录） |
+| 2. 启动是否激活 | 三个 marker 都不存在 = 不激活 | 菜单点一次，见下 |
 | 3. 进程是否开端口 | 上游只在带 `-unityPuerExecControl` 启动时开 | 启动参数加 `-unityPuerExecControl` |
 
-也就是说：**包在工程里、编译过了，也不会有任何端口在听**。想让同事「拉下来就有」是做不到的——`.gitignore` 已经把整个包挡在工程仓库外。
+第 2 层的 marker（按优先级，第一个命中的说了算）：
 
-要让 CLI 直接驱动一个从 Unity Hub 手动打开的编辑器，用第 2 层（菜单点一次即可，之后每次打开都自动激活、且仅本机）。要最干净的一次性会话，用第 3 层：
+| 文件 | 归属 | 作用 |
+| --- | --- | --- |
+| `UserSettings/PuerExecSuite/disabled` | 本机，永不提交 | 否决（项目级开启时用它关掉本机） |
+| `UserSettings/PuerExecSuite/enabled` | 本机，永不提交 | 只对自己生效 |
+| `ProjectSettings/PuerExecSuite/enabled` | 提交进仓库 → 全队 | 团队默认开启 |
+
+**开一次之后，以后每次打开 Editor 自动激活**：marker 是磁盘文件，`[InitializeOnLoad]` 的 gate 在每次域加载（启动 / 重新编译）时检查它，等导入和编译结束后替你调用上游的会话级激活，并带「上游改名就反射兜底」与「编译中自动重试」两条保护。你不需要每次手动点。
+
+也就是说：**包在工程里、编译过了，也不会有任何端口在听**。别人的机器上既没有包、也没有 marker，两条都默认关。
+
+要让 CLI 驱动一个从 Unity Hub 手动打开的编辑器，用第 2 层；要隔离日志（agent 按字节偏移读日志），必须用第 3 层冷启动——`-logFile` 只能在进程启动时绑定，中途激活拿不到：
 
 ```powershell
 & "C:\Program Files\Unity 2022.3.62f2\Editor\Unity.exe" `
@@ -79,6 +89,12 @@ Unity 的 embedded package 机制会自动识别 `Packages/<带 package.json 的
   -unityPuerExecControl `
   -logFile "C:\projects\MyGame\Temp\UnityPuerExec\Editor.log"
 ```
+
+## 要不要共享给同事
+
+默认不共享：安装脚本会把 `/Packages/com.yogioo.puer-exec-suite/` 写进工程 `.gitignore`，你自己克隆、同事拉不到。
+
+想共享有三条路（不提交 / 直接提交 / 子模块），对比与建议见 [Documentation~/sharing.md](Documentation~/sharing.md)。关键点：**共享包 ≠ 共享开启**——包进了仓库也依旧需要 marker 才会激活，而 marker 默认不存在。
 
 ## CLI
 
@@ -111,10 +127,10 @@ $cli = "Packages\com.yogioo.puer-exec-suite\Vendor\com.txcombo.unity-puer-exec\C
 
 ```
 package.json           UPM 描述（embedded package 的入口）
-Editor/                PuerExecSuiteGate：本机开关 + 菜单 + 状态
+Editor/                PuerExecSuiteGate：启动开关 + 菜单 + 状态
 Vendor/                上游三件套原样 + 裁剪（见 UPSTREAM.md）
 install.ps1 install.sh 安装/更新/卸载
-Documentation~/        安装、开关、上游同步
+Documentation~/        安装、开关、共享、上游同步
 UPSTREAM.md            上游版本与改动清单
 ```
 

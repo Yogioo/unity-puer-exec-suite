@@ -3,6 +3,7 @@
 #
 #   ./install.sh /path/to/UnityProject            install (project .gitignore updated)
 #   ./install.sh /path/to/UnityProject --enable   install + per-machine opt-in marker
+#   ./install.sh /path/to/UnityProject --enable-project   install + shared opt-in marker (commit it)
 #   ./install.sh /path/to/UnityProject --update   git pull inside the installed package
 #   ./install.sh /path/to/UnityProject --remove   uninstall
 #   --source <git-url|dir>   install from somewhere other than the default public repo
@@ -16,6 +17,7 @@ PKG=com.yogioo.puer-exec-suite
 SOURCE="https://github.com/Yogioo/unity-puer-exec-suite.git"
 PROJECT=""
 ENABLE=0
+ENABLE_PROJECT=0
 UPDATE=0
 REMOVE=0
 FORCE=0
@@ -25,6 +27,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --source) SOURCE=$2; shift 2 ;;
     --enable) ENABLE=1; shift ;;
+    --enable-project) ENABLE_PROJECT=1; shift ;;
     --update) UPDATE=1; shift ;;
     --remove) REMOVE=1; shift ;;
     --force) FORCE=1; shift ;;
@@ -35,11 +38,13 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -n "$PROJECT" ] || { echo "usage: $0 <unity-project> [--enable|--update|--remove]" >&2; exit 2; }
+[ -n "$PROJECT" ] || { echo "usage: $0 <unity-project> [--enable|--enable-project|--update|--remove]" >&2; exit 2; }
 [ -d "$PROJECT/Assets" ] || { echo "not a Unity project (no Assets/): $PROJECT" >&2; exit 2; }
 PROJECT=$(cd "$PROJECT" && pwd)
 TARGET="$PROJECT/Packages/$PKG"
 FLAG="$PROJECT/UserSettings/PuerExecSuite/enabled"
+FLAG_DISABLED="$PROJECT/UserSettings/PuerExecSuite/disabled"
+PROJECT_FLAG="$PROJECT/ProjectSettings/PuerExecSuite/enabled"
 ENTRY="/Packages/$PKG/"
 
 echo "project : $PROJECT"
@@ -72,8 +77,10 @@ drop_ignore() {
 if [ "$REMOVE" = 1 ]; then
   rm -rf "$TARGET"
   echo "  removed package folder"
-  rm -f "$FLAG"
-  echo "  removed opt-in marker"
+  rm -f "$FLAG" "$FLAG_DISABLED"
+  echo "  removed per-machine markers"
+  [ -f "$PROJECT_FLAG" ] && echo "  kept ProjectSettings/PuerExecSuite/enabled (shared team decision)"
+  true
   drop_ignore
   echo
   echo "Done. Refocus the Unity Editor to unload the package."
@@ -87,8 +94,30 @@ if [ "$UPDATE" = 1 ]; then
   exit 0
 fi
 
+write_markers() {
+  if [ "$ENABLE" = 1 ]; then
+    mkdir -p "$(dirname "$FLAG")"
+    printf 'enabled\n' > "$FLAG"
+    rm -f "$FLAG_DISABLED"
+    echo "  enable  $FLAG (this machine)"
+  fi
+  if [ "$ENABLE_PROJECT" = 1 ]; then
+    mkdir -p "$(dirname "$PROJECT_FLAG")"
+    printf 'enabled\n' > "$PROJECT_FLAG"
+    echo "  enable  $PROJECT_FLAG (commit this to share with the team)"
+  fi
+}
+
 if [ -e "$TARGET" ]; then
-  [ "$FORCE" = 1 ] || { echo "$TARGET already exists (use --update / --force / --remove)" >&2; exit 2; }
+  if [ "$FORCE" != 1 ]; then
+    if [ "$ENABLE" = 1 ] || [ "$ENABLE_PROJECT" = 1 ]; then
+      echo "  package already installed; updating markers only"
+      write_markers
+      exit 0
+    fi
+    echo "$TARGET already exists (use --update / --force / --remove)" >&2
+    exit 2
+  fi
   rm -rf "$TARGET"
   echo "  removed previous install (--force)"
 fi
@@ -115,20 +144,29 @@ echo "  install $TARGET"
 
 add_ignore
 
+write_markers
+
 if [ "$ENABLE" = 1 ]; then
   mkdir -p "$(dirname "$FLAG")"
   printf 'enabled\n' > "$FLAG"
-  echo "  enable  $FLAG"
+  rm -f "$FLAG_DISABLED"
+  echo "  enable  $FLAG (this machine)"
+fi
+
+if [ "$ENABLE_PROJECT" = 1 ]; then
+  mkdir -p "$(dirname "$PROJECT_FLAG")"
+  printf 'enabled\n' > "$PROJECT_FLAG"
+  echo "  enable  $PROJECT_FLAG (commit this to share with the team)"
 fi
 
 cat <<EOF
 
 Done. Next steps:
   1. Refocus or reopen the Unity Editor; the package compiles editor-only.
-  2. Off by default. To drive this Editor from a CLI either:
-       a) launch with the activation switch:
-          Unity -projectPath "$PROJECT" -unityPuerExecControl
-       b) or opt in on this machine (persists across Editor restarts):
-          menu Tools/Puer Exec Suite/Enable On This Machine
+  2. Off by default. Enable once, then it auto-activates on every Editor start:
+       menu Tools/Puer Exec Suite/Enable On This Machine    (this machine only)
+       menu Tools/Puer Exec Suite/Enable For This Project   (committed, whole team)
+     Per-process, for an isolated log:
+       Unity -projectPath "$PROJECT" -unityPuerExecControl
      CLI: $TARGET/Vendor/com.txcombo.unity-puer-exec/CLI~/unity-puer-exec.exe
 EOF

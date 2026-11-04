@@ -18,6 +18,10 @@
 .PARAMETER Enable
     Also write the per-machine opt-in marker (UserSettings/PuerExecSuite/enabled).
 
+.PARAMETER EnableProject
+    Also write the shared opt-in marker (ProjectSettings/PuerExecSuite/enabled). Commit it to
+    opt the whole team in; a teammate can veto locally with UserSettings/PuerExecSuite/disabled.
+
 .PARAMETER Update
     git pull --ff-only inside the already installed package folder.
 
@@ -45,6 +49,7 @@ param(
     [string]$Source = "https://github.com/Yogioo/unity-puer-exec-suite.git",
     [string]$PackageName = "com.yogioo.puer-exec-suite",
     [switch]$Enable,
+    [switch]$EnableProject,
     [switch]$Update,
     [switch]$Remove,
     [switch]$Force,
@@ -106,8 +111,7 @@ function Remove-IgnoreEntry {
     }
 }
 
-function Install-FromSource {
-    param([string]$From, [string]$To)
+function Install-FromSource {    param([string]$From, [string]$To)
     $isGitUrl = $From -match '^(https?|git|ssh)://' -or $From -match '^git@' -or $From -match '\.git$'
     if ($isGitUrl) {
         if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'git not found on PATH' }
@@ -126,10 +130,26 @@ function Install-FromSource {
         ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $To -Recurse -Force }
 }
 
+function Write-Markers {
+    if ($Enable) {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $flag) -Force | Out-Null
+        Write-Utf8NoBom -Path $flag -Lines @('enabled')
+        if (Test-Path -LiteralPath $flagDisabled) { Remove-Item -LiteralPath $flagDisabled -Force }
+        Write-Host "  enable  $flag (this machine)"
+    }
+    if ($EnableProject) {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $projectFlag) -Force | Out-Null
+        Write-Utf8NoBom -Path $projectFlag -Lines @('enabled')
+        Write-Host "  enable  $projectFlag (commit this to share with the team)"
+    }
+}
+
 $root = Resolve-ProjectRoot -Path $Project
 $packagesDir = Join-Path $root 'Packages'
 $target = Join-Path $packagesDir $PackageName
 $flag = Join-Path $root 'UserSettings\PuerExecSuite\enabled'
+$flagDisabled = Join-Path $root 'UserSettings\PuerExecSuite\disabled'
+$projectFlag = Join-Path $root 'ProjectSettings\PuerExecSuite\enabled'
 
 Write-Host "project : $root"
 Write-Host "package : $target"
@@ -145,7 +165,14 @@ if ($Remove) {
     }
     if (Test-Path -LiteralPath $flag) {
         Remove-Item -LiteralPath $flag -Force
-        Write-Host '  removed opt-in marker'
+        Write-Host '  removed per-machine opt-in marker'
+    }
+    if (Test-Path -LiteralPath $flagDisabled) {
+        Remove-Item -LiteralPath $flagDisabled -Force
+        Write-Host '  removed per-machine veto marker'
+    }
+    if (Test-Path -LiteralPath $projectFlag) {
+        Write-Host '  kept ProjectSettings/PuerExecSuite/enabled (shared team decision; delete it yourself if unintended)'
     }
     Remove-IgnoreEntry -Root $root -Entry "Packages/$PackageName"
     Write-Host ''
@@ -169,6 +196,11 @@ if ($Update) {
 
 if (Test-Path -LiteralPath $target) {
     if (-not $Force) {
+        if ($Enable -or $EnableProject) {
+            Write-Host '  package already installed; updating markers only'
+            Write-Markers
+            return
+        }
         throw "$target already exists. Use -Update to pull, -Force to reinstall, or -Remove to uninstall."
     }
     $resolved = (Resolve-Path -LiteralPath $target).ProviderPath
@@ -183,19 +215,15 @@ Write-Host "  install $target"
 
 Add-IgnoreEntry -Root $root -Entry "Packages/$PackageName"
 
-if ($Enable) {
-    New-Item -ItemType Directory -Path (Split-Path -Parent $flag) -Force | Out-Null
-    Write-Utf8NoBom -Path $flag -Lines @('enabled')
-    Write-Host "  enable  $flag"
-}
+Write-Markers
 
 $cli = Join-Path $target 'Vendor\com.txcombo.unity-puer-exec\CLI~\unity-puer-exec.exe'
 Write-Host ''
 Write-Host 'Done. Next steps:'
 Write-Host '  1. Refocus or reopen the Unity Editor; the package compiles editor-only.'
-Write-Host '  2. Off by default. To drive this Editor from a CLI either:'
-Write-Host "       a) launch with the activation switch:"
-Write-Host "          Unity.exe -projectPath `"$root`" -unityPuerExecControl"
-Write-Host '       b) or opt in on this machine (persists across Editor restarts):'
-Write-Host '          menu Tools/Puer Exec Suite/Enable On This Machine'
+Write-Host '  2. Off by default. Enable once, then it auto-activates on every Editor start:'
+Write-Host '       menu Tools/Puer Exec Suite/Enable On This Machine     (this machine only)'
+Write-Host '       menu Tools/Puer Exec Suite/Enable For This Project   (committed, whole team)'
+Write-Host '     Per-process, for an isolated log:'
+Write-Host "       Unity.exe -projectPath `"$root`" -unityPuerExecControl"
 Write-Host "     CLI: $cli"

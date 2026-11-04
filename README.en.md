@@ -34,11 +34,11 @@ Unity treats any folder inside `Packages/` that has a `package.json` as an **emb
 Or use the script (writes the `.gitignore` entry, optionally opts this machine in):
 
 ```powershell
-.\install.ps1 -Project C:\projects\MyGame [-Enable] [-Update] [-Remove]
+.\install.ps1 -Project C:\projects\MyGame [-Enable] [-EnableProject] [-Update] [-Remove]
 ```
 
 ```bash
-./install.sh /path/to/MyGame [--enable] [--update] [--remove]
+./install.sh /path/to/MyGame [--enable] [--enable-project] [--update] [--remove]
 ```
 
 After the Editor reimports and compiles, a `Tools/Puer Exec Suite` menu appears.
@@ -46,14 +46,29 @@ After the Editor reimports and compiles, a `Tools/Puer Exec Suite` menu appears.
 ## Three layers, all off by default
 
 1. **Folder present?** Absent means nothing compiles. Remove it or run `install.ps1 -Remove`.
-2. **Machine opted in?** `UserSettings/PuerExecSuite/enabled` absent means the suite never activates. `UserSettings/` is machine-local and already gitignored by Unity.
+2. **Activation on startup?** Resolved from three marker files, first hit wins:
+
+| File | Scope | Effect |
+| --- | --- | --- |
+| `UserSettings/PuerExecSuite/disabled` | machine only, never committed | veto, overrides the project file |
+| `UserSettings/PuerExecSuite/enabled` | machine only, never committed | opt in for yourself |
+| `ProjectSettings/PuerExecSuite/enabled` | committed → whole team | opt in for the team |
+
+None present means the suite stays silent even when the package folder is present.
+
 3. **Process opted in?** The upstream endpoint only opens when the Editor is launched with `-unityPuerExecControl`.
 
-A package that is committed and compiled still listens on nothing. Layer 2 (one menu click) is the convenient path for an Editor you opened from Unity Hub; layer 3 is the fully isolated path:
+**Enable once, activated on every start afterwards.** The marker is a file on disk; the `[InitializeOnLoad]` gate re-reads it after every domain reload (startup, script recompile), waits for import/compile to settle, then performs the upstream session-scoped activation for you — with a reflection fallback if upstream renames its menu item, and bounded retries while Unity is busy.
+
+For an Editor you opened from Unity Hub, layer 2 is the convenient path. For isolated logs (an agent reading the log by byte offset) you need layer 3, because `-logFile` is bound at process start and cannot be granted later:
 
 ```powershell
 & "C:\Program Files\Unity 2022.3.62f2\Editor\Unity.exe" -projectPath C:\projects\MyGame -unityPuerExecControl -logFile C:\projects\MyGame\Temp\UnityPuerExec\Editor.log
 ```
+
+## Share with the team or not
+
+Not by default: the installers add `/Packages/com.yogioo.puer-exec-suite/` to the project `.gitignore`, so the clone stays on your machine. Committing the package, using a submodule, and keeping it local are compared in [Documentation~/sharing.md](Documentation~/sharing.md). The key point: **sharing the package is not sharing the opt-in** — a committed package still activates nothing until a marker exists.
 
 ## CLI
 
