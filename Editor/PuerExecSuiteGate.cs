@@ -393,6 +393,8 @@ namespace PuerExecSuite
                 return;
             }
 
+            PuerExecNativeLoader.EnsureLoaded();
+
             if (EditorApplication.ExecuteMenuItem(UpstreamActivateMenuItem) || ActivatedByUpstream())
             {
                 Debug.Log("[PuerExecSuite] Control endpoint activated for this session.");

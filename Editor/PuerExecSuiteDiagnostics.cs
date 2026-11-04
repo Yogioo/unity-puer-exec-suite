@@ -164,6 +164,13 @@ namespace PuerExecSuite
                 }
             }
 
+            PuerExecNativeLoader.EnsureLoaded(true);
+            lines.Add("  native preload:");
+            foreach (var preloadLine in PuerExecNativeLoader.LastResult.Split(new[] { '\n' }))
+            {
+                lines.Add("    " + preloadLine.Trim());
+            }
+
             lines.Add("  probe DllImport(\"PuertsCore\") :");
             lines.Add("    " + ProbePuertsCore());
 
