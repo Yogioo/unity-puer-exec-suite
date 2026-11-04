@@ -49,16 +49,35 @@ ProjectSettings/PuerExecSuite/enabled  提交后对全队生效
 
 这是 UPM 对 embedded package 的正常记账，不是配置错误。它的含义是先有鸡后有蛋：「包在 `Packages/` 下」这件事 Unity 要记下来，而它只记在 lock 里。
 
-怎么处理：
+怎么处理（行为已实测，不是推测）：
 
-| 做法 | 结果 | 代价 |
+删除是**必然且静默**的。在临时工程里只保留这条指向不存在目录的记录，Unity 一启动就把它删了，日志只留一句 `[Package Manager] Lock file was modified`，**没有 warning、没有 error**，也不提包名。所以：
+
+- 有包的人：lock 多一条 → dirty。
+- 没包的人：lock 少一条 → dirty（且会连带把 key 重排序，可能多出几行无关 diff）。
+
+**两边必然有一边脏，且脏的是「少数派」还是「多数派」取决于你提交不提交。** 因此：
+
+| 做法 | 谁脏 | 适合 |
 | --- | --- | --- |
-| **提交（推荐）** | 有包的人 lock 干净 | 没装的人首次开 Unity 时这一条会被 UPM 删掉，他们的 lock 脏一次 |
-| `git update-index --skip-worktree Packages/packages-lock.json` | 本机彻底看不见 | 别人往 lock 里加/删其它包时，pull 会因 skip-worktree 撞车，需要先 `--no-skip-worktree` |
-| 每次 `git checkout -- Packages/packages-lock.json` | 不改别人的 lock | 反复出现的噪音，容易误夹杂进提交 |
+| **不提交这条**（推荐） | 只有装了包的人（少数） | 默认场景：包不共享、只有自己用 |
+| 提交这条 | 没装包的人（多数，且每人只脏一次） | 以后包共享给全队（B/C 收法）时反过来 |
 
-关键前提：`manifest.json` 里**没有**这个包的依赖声明，所以这条 lock 记录对别人是惰性数据——缺包时 Unity 只是把这条删掉，不会报错、不影响构建。属性上它更接近「我这台机器装了」的备注。
+本机把这条脏收掉的两种办法：
 
-因此推荐：**提交它**，并在团队里约定「没装这个包的人顺手删掉那一条的 diff 不要提交」；若团队对 lock 的完整性有洁癖，就退回 `skip-worktree`（本项目级的局部隐身，跟当年 DigitDoor 的做法一致）。
+```bash
+# 隐身：本地改动不再显示（推荐，DigitDoor 当年的做法）
+git update-index --skip-worktree Packages/packages-lock.json
+
+# 别人改了 lock 导致 pull 报 'local changes would be overwritten' 时
+git update-index --no-skip-worktree Packages/packages-lock.json
+git checkout -- Packages/packages-lock.json
+git pull
+git update-index --skip-worktree Packages/packages-lock.json
+```
+
+skip-worktree 的代价要认：从此刻起**你会看不到别人对 lock 的所有改动**，每次队友增删包都得拆一次隐身再 pull。若团队里 lock 变动频繁，另一个选择是受着这条脏（推之前 `git checkout -- Packages/packages-lock.json`），反正它只多 6 行。
+
+另一个必须知道的前提：`manifest.json` 里**没有**这个包的依赖声明，所以这条 lock 记录对别人是惰性数据——缺包时 Unity 只是静默删掉，不报错、不影响构建、不影响 CI。属性上它更接近「我这台机器装了」的备注，而不是真依赖。
 
 如果反过来想知道「能不能让这条记录压根不产生」：唯一彻底的办法是不用 embedded package，改在 `manifest.json` 里写 git 依赖（`"com.yogioo.puer-exec-suite": "https://github.com/Yogioo/unity-puer-exec-suite.git"`）。那条 lock 记录会变成 `source: git`、对所有人一致，代价是：包对所有人**都装上了**（开启与否仍由 marker 决定），且 UPM 拉 git 依赖走 https——被墙的机器解析不了。
