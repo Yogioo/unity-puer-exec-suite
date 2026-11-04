@@ -83,7 +83,7 @@ git clone https://github.com/Yogioo/unity-puer-exec-suite.git Assets/Editor/Puer
 
 1. 回到 Unity，等待 import + 编译（首次 1~2 分钟；`PapiV8.dll` 13MB，只是 import 不编译）。
 2. 菜单出现 `Tools/Puer Exec Suite`。
-3. `Tools/Puer Exec Suite/Status` 打一行状态：安装位置、生效来源、三个 marker、端口、CLI 路径。
+3. `Tools ▸ Puer Exec Suite ▸ 控制面板`：顶部状态条 + 三个主按钮 + 每个开关的一句话解释都在里面；排查问题时展开底部「详细信息」。
 4. 编译错误里不应出现 `UnityPuerExec` / `com.tencent.puerts.*` 相关条目。若有，见下节。
 
 ## 常见冲突

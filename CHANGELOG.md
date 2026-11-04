@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- 新增 **控制面板窗口**（`Tools ▸ Puer Exec Suite ▸ 控制面板`）：顶部彩色状态条（已开启且监听 / 已开启未激活 / 已关闭 / 已关闭但端口仍开）、三个主按钮、开关现状三行解释、全队开关、agent 区（CLI 路径与冷启动命令一键复制）、可折叠的详细信息（三个 marker 路径与状态、端点文件、打印完整状态）。
+- 菜单项改成中文人话并全部带 validate + 勾选：`本机开启（之后每次启动自动激活）`、`本机关闭`、`允许全队默认开启（写 ProjectSettings，需提交）`、`撤销全队默认开启`、`仅本次会话立即激活`、`状态：打印到 Console`、`定位 CLI 文件`。
+- `PuerExecSuiteGate` 新增公开状态接口供窗口使用：`MachineEnabled`、`MachineVeto`、`ProjectEnabled`、`EndpointPublished`、`EndpointPort`、`BridgeVersion`、`ActivateNow()`、`LogStatus()`。
+- 修 0.3.1 遗留的菜单常量与方法重名（`CS1503`）。
+
 ## 0.3.1
 
 - **修 B 装法（Assets 位置）下 CLI 无法握手**：`UnityPuerExecServer.ResolveBridgeVersion` 在非 package 安装时拿到 null，上报空版本 → CLI 返回 `version_mismatch / bridge_version_unknown` 并拒绝执行。改为带编译期常量兜底（见 UPSTREAM.md 改动 5）。

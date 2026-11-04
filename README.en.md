@@ -83,6 +83,19 @@ None present means the module stays silent even when it is installed and compile
 
 **Enable once, activated on every start afterwards.** The marker is a file on disk; the `[InitializeOnLoad]` gate re-reads it after every domain reload, waits for import/compile to settle, then performs the upstream session-scoped activation for you — with a reflection fallback if upstream renames its menu item, and bounded retries while Unity is busy.
 
+## Control panel (recommended entry point)
+
+`Tools ▸ Puer Exec Suite ▸ 控制面板 (Control Panel)` — the menu labels and the window copy are in Chinese, since the team using it is; the layout is:
+
+- a colour-coded status banner ("on and listening on 127.0.0.1:55231" / "on, not activated this session" / "off" / "off, port still open"),
+- three primary buttons — `开启（只影响我）` enable for this machine, `关闭（只影响我）` disable for this machine, `立即激活本次会话` activate now — each with a one-paragraph plain-language caption underneath,
+- a three-row breakdown of what each layer is currently doing (module present / activation on startup / port this session),
+- the team-wide pair (`允许全队默认开启` writes the committable `ProjectSettings` marker, `撤销全队默认开启` removes it),
+- an "for agents" block that shows the CLI path with copy buttons and a copyable cold-start command,
+- a collapsible details block listing every marker file, the endpoint file and a "dump full status to Console" button.
+
+Every state change is visible in the buttons themselves (disabled/checked), so no action looks like a no-op.
+
 For an Editor you opened from Unity Hub, layer 2 is the convenient path. For isolated logs (an agent reading the log by byte offset) you need layer 3, because `-logFile` is bound at process start:
 
 ```powershell

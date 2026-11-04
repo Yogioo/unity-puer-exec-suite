@@ -24,17 +24,20 @@
 
 三个都不存在 = 关闭。`UserSettings/` 是 Unity 自己的本机目录（默认 `.gitignore` 已排除），所以个人开关天然不进 git；`ProjectSettings/` 是仓库里的目录，写在那里就意味着「我要共享这个决定」。
 
-菜单（`Tools/Puer Exec Suite/`）：
+日常用控制面板（`Tools ▸ Puer Exec Suite ▸ 控制面板 (Control Panel)`），它把同样的动作做成带解释的按钮，并把状态画在顶部状态条里。菜单里的同名动作是给脚本 / agent 用的：
 
 | 菜单项 | 效果 |
 | --- | --- |
-| Enable On This Machine | 写 `UserSettings/.../enabled`，并清掉本机 veto |
-| Disable On This Machine | 写 `UserSettings/.../disabled`，立即生效（端口在 Editor 重启前仍开着，会打 Warning） |
-| Enable For This Project (committed) | 写 `ProjectSettings/.../enabled`，提示你提交 |
-| Disable For This Project (committed) | 删掉项目 marker |
-| Activate Now (this session) | 不管 marker，本会话立刻激活 |
-| Status | 打一行：生效来源、三个 marker、端口、CLI 路径 |
-| Reveal CLI | 在资源管理器里定位 CLI exe |
+| 控制面板 (Control Panel) | 打开图形面板：状态 + 按钮 + 每个按钮的说明 |
+| 本机开启（之后每次启动自动激活） | 写 `UserSettings/.../enabled`，清掉本机否决 |
+| 本机关闭 | 写 `UserSettings/.../disabled`，优先于项目级开启；端口在 Editor 重启前仍开着，会打 Warning |
+| 允许全队默认开启（写 ProjectSettings，需提交） | 写 `ProjectSettings/.../enabled` |
+| 撤销全队默认开启 | 删掉项目 marker |
+| 仅本次会话立即激活 | 不管 marker，本会话立刻激活 |
+| 状态：打印到 Console | 打一段：安装位置、生效来源、三个 marker、端点端口、CLI 路径 |
+| 定位 CLI 文件 | 在资源管理器里定位 CLI exe |
+
+菜单项都带 validate 与勾选：已开启的那项会打勾并变灰，不会出现「点了没反应」。
 
 ## 开启一次之后为什么每次启动都自动激活
 
