@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- 新增 **`Assets/Editor/PuerExecSuite` 装法并设为默认**：UPM 完全不参与，`Packages/packages-lock.json` 不再被写入或删除，团队里任何人的 `git status` 都不会因本模块变脏。原 `Packages/<name>` 装法保留为 `-Location packages` / `--location packages`。
+- `install.ps1` / `install.sh` 重构为支持两种位置：`-Location`、`-Remove` 会清两个位置、`-Update` 会处理两个位置、两种位置同时存在时拒绝安装（同名 asmdef 冲突）。
+- `PuerExecSuiteGate`：新增 `InstallRoot` / `IsInstalled`，`CliPath` 自动定位两种装法；Status 菜单显示安装位置。
+- 文档：README 双语补「两种装法」对比；`sharing.md` 的 lock 记录一节改为「只有 B 装法被牵连」；`install.md` 重写。
+
 ## 0.2.0
 
 - `PuerExecSuiteGate` 支持**一次开启、之后每次打开 Editor 自动激活**：marker 落在磁盘，域加载后等编译/导入结束再替上游做会话级激活（`ExecuteMenuItem` → 反射兜底 → 有界重试）。

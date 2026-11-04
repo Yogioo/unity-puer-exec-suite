@@ -48,7 +48,7 @@ com.tencent.puerts.v8/Plugins/x86_64/PapiV8.dll
 
 ### 4. 摊平目录（`Vendor/<pkg>/` 而不是 `Packages/<pkg>/`）
 
-Unity 只把 `Packages/` 的第一层目录当 embedded package，所以三个包被放进本包的 `Vendor/` 子目录；它们的 `package.json` 在本包视角下只是普通资源，不会被当成独立包解析。副作用只有一个：PuerTS 的 IL2Cpp 代码生成菜单硬编码了 `Path.GetFullPath("Packages/com.tencent.puerts.core/")`，在本模块下不可用（本模块不使用 IL2Cpp 生成）。
+三个包被放进本模块的 `Vendor/` 子目录；它们的 `package.json` 在模块视角下只是普通资源，不会被当成独立包解析。默认装法整个模块落在 `Assets/Editor/PuerExecSuite`（UPM 完全不参与），也可选 `Packages/com.yogioo.puer-exec-suite`（UPM 视为 embedded package，此时本目录里的 `package.json` 才是清单）。副作用只有一个：PuerTS 的 IL2Cpp 代码生成菜单硬编码了 `Path.GetFullPath("Packages/com.tencent.puerts.core/")`，在本模块下不可用（本模块不使用 IL2Cpp 生成）。
 
 ## 为什么不用 UPM 依赖直接引用
 

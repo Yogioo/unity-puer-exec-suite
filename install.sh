@@ -1,21 +1,31 @@
 #!/bin/sh
-# Install com.yogioo.puer-exec-suite into a Unity project as an embedded package.
+# Install com.yogioo.puer-exec-suite into a Unity project as a local, gitignored tree.
 #
-#   ./install.sh /path/to/UnityProject            install (project .gitignore updated)
-#   ./install.sh /path/to/UnityProject --enable   install + per-machine opt-in marker
-#   ./install.sh /path/to/UnityProject --enable-project   install + shared opt-in marker (commit it)
-#   ./install.sh /path/to/UnityProject --update   git pull inside the installed package
-#   ./install.sh /path/to/UnityProject --remove   uninstall
+#   ./install.sh /path/to/UnityProject                 install into Assets/Editor/PuerExecSuite (default)
+#   ./install.sh /path/to/UnityProject --location packages   install as a UPM embedded package instead
+#   ./install.sh /path/to/UnityProject --enable        install + per-machine opt-in marker
+#   ./install.sh /path/to/UnityProject --enable-project      install + shared opt-in marker (commit it)
+#   ./install.sh /path/to/UnityProject --update        git pull inside the installed tree
+#   ./install.sh /path/to/UnityProject --remove        uninstall from both locations
 #   --source <git-url|dir>   install from somewhere other than the default public repo
-#   --force                  reinstall over an existing folder
-#   --no-ignore               leave the project .gitignore alone
+#   --force                  reinstall over an existing tree
+#   --no-ignore              leave the project .gitignore alone
+#
+# Location matters for git hygiene:
+#   assets   code is compiled as project content; the Package Manager never sees it, so
+#            Packages/packages-lock.json is never touched.
+#   packages a UPM embedded package; UPM then records (and on other machines prunes)
+#            a packages-lock.json entry, dirtying the lock on whichever side lacks it.
 #
 # NOTE: the bundled native plugins are Windows Editor only (x86_64).
 set -e
 
 PKG=com.yogioo.puer-exec-suite
+ASSET_REL=Assets/Editor/PuerExecSuite
+PACKAGE_REL=Packages/$PKG
 SOURCE="https://github.com/Yogioo/unity-puer-exec-suite.git"
 PROJECT=""
+LOCATION=assets
 ENABLE=0
 ENABLE_PROJECT=0
 UPDATE=0
@@ -25,6 +35,7 @@ NOIGNORE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --location) LOCATION=$2; shift 2 ;;
     --source) SOURCE=$2; shift 2 ;;
     --enable) ENABLE=1; shift ;;
     --enable-project) ENABLE_PROJECT=1; shift ;;
@@ -32,27 +43,36 @@ while [ $# -gt 0 ]; do
     --remove) REMOVE=1; shift ;;
     --force) FORCE=1; shift ;;
     --no-ignore) NOIGNORE=1; shift ;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     -*) echo "unknown option: $1" >&2; exit 2 ;;
     *) PROJECT=$1; shift ;;
   esac
 done
 
-[ -n "$PROJECT" ] || { echo "usage: $0 <unity-project> [--enable|--enable-project|--update|--remove]" >&2; exit 2; }
+case "$LOCATION" in
+  assets) REL_TARGET=$ASSET_REL ;;
+  packages) REL_TARGET=$PACKAGE_REL ;;
+  *) echo "--location must be assets or packages" >&2; exit 2 ;;
+esac
+
+[ -n "$PROJECT" ] || { echo "usage: $0 <unity-project> [--location assets|packages] [--enable|--enable-project|--update|--remove]" >&2; exit 2; }
 [ -d "$PROJECT/Assets" ] || { echo "not a Unity project (no Assets/): $PROJECT" >&2; exit 2; }
 PROJECT=$(cd "$PROJECT" && pwd)
-TARGET="$PROJECT/Packages/$PKG"
+TARGET="$PROJECT/$REL_TARGET"
+OTHER_TARGET="$PROJECT/$( [ "$LOCATION" = packages ] && echo "$ASSET_REL" || echo "$PACKAGE_REL" )"
+OTHER_REL=$( [ "$LOCATION" = packages ] && echo "$ASSET_REL" || echo "$PACKAGE_REL" )
 FLAG="$PROJECT/UserSettings/PuerExecSuite/enabled"
 FLAG_DISABLED="$PROJECT/UserSettings/PuerExecSuite/disabled"
 PROJECT_FLAG="$PROJECT/ProjectSettings/PuerExecSuite/enabled"
-ENTRY="/Packages/$PKG/"
 
 echo "project : $PROJECT"
-echo "package : $TARGET"
+echo "location: $LOCATION"
+echo "target  : $TARGET"
 echo
 
 add_ignore() {
   [ "$NOIGNORE" = 1 ] && return 0
+  ENTRY="/$1/"
   touch "$PROJECT/.gitignore"
   grep -qxF "$ENTRY" "$PROJECT/.gitignore" && return 0
   if [ -s "$PROJECT/.gitignore" ]; then
@@ -65,6 +85,7 @@ add_ignore() {
 
 drop_ignore() {
   [ -f "$PROJECT/.gitignore" ] || return 0
+  ENTRY="/$1/"
   if grep -qxF "$ENTRY" "$PROJECT/.gitignore"; then
     grep -vxF "$ENTRY" "$PROJECT/.gitignore" \
       | grep -vxF '# puer-exec suite: per-machine, default off' \
@@ -73,26 +94,6 @@ drop_ignore() {
     echo "  ignore  $ENTRY removed from .gitignore"
   fi
 }
-
-if [ "$REMOVE" = 1 ]; then
-  rm -rf "$TARGET"
-  echo "  removed package folder"
-  rm -f "$FLAG" "$FLAG_DISABLED"
-  echo "  removed per-machine markers"
-  [ -f "$PROJECT_FLAG" ] && echo "  kept ProjectSettings/PuerExecSuite/enabled (shared team decision)"
-  true
-  drop_ignore
-  echo
-  echo "Done. Refocus the Unity Editor to unload the package."
-  exit 0
-fi
-
-if [ "$UPDATE" = 1 ]; then
-  [ -d "$TARGET/.git" ] || { echo "no git checkout at $TARGET; reinstall instead" >&2; exit 2; }
-  git -C "$TARGET" pull --ff-only
-  echo "  updated"
-  exit 0
-fi
 
 write_markers() {
   if [ "$ENABLE" = 1 ]; then
@@ -108,10 +109,43 @@ write_markers() {
   fi
 }
 
+if [ "$REMOVE" = 1 ]; then
+  for rel in "$ASSET_REL" "$PACKAGE_REL"; do
+    if [ -e "$PROJECT/$rel" ]; then
+      rm -rf "$PROJECT/$rel"
+      echo "  removed $rel"
+      drop_ignore "$rel"
+    fi
+  done
+  rm -f "$FLAG" "$FLAG_DISABLED"
+  echo "  removed per-machine markers"
+  if [ -f "$PROJECT_FLAG" ]; then
+    echo "  kept ProjectSettings/PuerExecSuite/enabled (shared team decision)"
+  fi
+  echo
+  echo "Done. Refocus the Unity Editor to unload the module."
+  exit 0
+fi
+
+if [ "$UPDATE" = 1 ]; then
+  for rel in "$ASSET_REL" "$PACKAGE_REL"; do
+    if [ -d "$PROJECT/$rel/.git" ]; then
+      git -C "$PROJECT/$rel" pull --ff-only
+      echo "  updated $rel"
+    fi
+  done
+  exit 0
+fi
+
+if [ -e "$OTHER_TARGET" ]; then
+  echo "$OTHER_REL is also installed; run --remove first (duplicate assembly names otherwise)" >&2
+  exit 2
+fi
+
 if [ -e "$TARGET" ]; then
   if [ "$FORCE" != 1 ]; then
     if [ "$ENABLE" = 1 ] || [ "$ENABLE_PROJECT" = 1 ]; then
-      echo "  package already installed; updating markers only"
+      echo "  already installed; updating markers only"
       write_markers
       exit 0
     fi
@@ -122,7 +156,7 @@ if [ -e "$TARGET" ]; then
   echo "  removed previous install (--force)"
 fi
 
-mkdir -p "$PROJECT/Packages"
+mkdir -p "$(dirname "$TARGET")"
 case "$SOURCE" in
   http*|git@*|*.git)
     if ! git clone --depth 1 "$SOURCE" "$TARGET"; then
@@ -142,27 +176,14 @@ case "$SOURCE" in
 esac
 echo "  install $TARGET"
 
-add_ignore
+add_ignore "$REL_TARGET"
 
 write_markers
-
-if [ "$ENABLE" = 1 ]; then
-  mkdir -p "$(dirname "$FLAG")"
-  printf 'enabled\n' > "$FLAG"
-  rm -f "$FLAG_DISABLED"
-  echo "  enable  $FLAG (this machine)"
-fi
-
-if [ "$ENABLE_PROJECT" = 1 ]; then
-  mkdir -p "$(dirname "$PROJECT_FLAG")"
-  printf 'enabled\n' > "$PROJECT_FLAG"
-  echo "  enable  $PROJECT_FLAG (commit this to share with the team)"
-fi
 
 cat <<EOF
 
 Done. Next steps:
-  1. Refocus or reopen the Unity Editor; the package compiles editor-only.
+  1. Refocus or reopen the Unity Editor; the module compiles editor-only.
   2. Off by default. Enable once, then it auto-activates on every Editor start:
        menu Tools/Puer Exec Suite/Enable On This Machine    (this machine only)
        menu Tools/Puer Exec Suite/Enable For This Project   (committed, whole team)

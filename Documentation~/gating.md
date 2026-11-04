@@ -64,7 +64,8 @@ marker 是磁盘上的文件，进程退出不消失。`PuerExecSuiteGate` 是 `
 ## 给 agent 的调用姿势
 
 ```powershell
-$cli = "Packages\com.yogioo.puer-exec-suite\Vendor\com.txcombo.unity-puer-exec\CLI~\unity-puer-exec.exe"
+# 默认装法；B 装法把 Assets\Editor\PuerExecSuite 换成 Packages\com.yogioo.puer-exec-suite
+$cli = "Assets\Editor\PuerExecSuite\Vendor\com.txcombo.unity-puer-exec\CLI~\unity-puer-exec.exe"
 
 # 探活 / 看编译错误
 & $cli get-compile-errors --project-path .
@@ -75,7 +76,7 @@ $cli = "Packages\com.yogioo.puer-exec-suite\Vendor\com.txcombo.unity-puer-exec\C
 
 每次都带 `--project-path`：一台机器上可能有多个 worktree / 多份拷贝，端点只对启动时激活的那一个 Editor 有效。端点信息落在 `<project>/Temp/UnityPuerExec/endpoint.json`（Temp 不进 git）。
 
-`$cli --help` 永远是可用的第一手信息，不要凭记忆拼参数。
+`$cli --help` 永远是可用的第一手信息，不要凭记忆拼参数。不想拼路径就用 `PuerExecSuite.PuerExecSuiteGate.CliPath`，它两种装法都会自动定位。
 
 ## 端口与安全
 

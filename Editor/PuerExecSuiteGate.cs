@@ -25,6 +25,10 @@ namespace PuerExecSuite
     {
         public const string PackageName = "com.yogioo.puer-exec-suite";
 
+        public const string AssetsInstallRoot = "Assets/Editor/PuerExecSuite";
+
+        public const string PackageInstallRoot = "Packages/com.yogioo.puer-exec-suite";
+
         public const string ActivationSwitch = "-unityPuerExecControl";
 
         public const string UpstreamActivateMenuItem = "Tools/UnityPuerExec/Activate CLI Control (this session)";
@@ -35,8 +39,7 @@ namespace PuerExecSuite
 
         public const string ProjectEnabledPath = "ProjectSettings/PuerExecSuite/enabled";
 
-        public const string CliRelativePath =
-            "Packages/" + PackageName + "/Vendor/com.txcombo.unity-puer-exec/CLI~/unity-puer-exec.exe";
+        private const string CliTail = "/Vendor/com.txcombo.unity-puer-exec/CLI~/unity-puer-exec.exe";
 
         private const string MenuRoot = "Tools/Puer Exec Suite/";
 
@@ -86,9 +89,43 @@ namespace PuerExecSuite
             get { return ActivatedByCommandLine() || ActivatedByUpstream(); }
         }
 
+        public static string InstallRoot
+        {
+            get
+            {
+                if (Directory.Exists(ProjectPath(AssetsInstallRoot)))
+                {
+                    return AssetsInstallRoot;
+                }
+
+                return Directory.Exists(ProjectPath(PackageInstallRoot)) ? PackageInstallRoot : string.Empty;
+            }
+        }
+
+        public static bool IsInstalled
+        {
+            get
+            {
+                return Directory.Exists(ProjectPath(AssetsInstallRoot))
+                       || Directory.Exists(ProjectPath(PackageInstallRoot));
+            }
+        }
+
         public static string CliPath
         {
-            get { return ProjectPath(CliRelativePath); }
+            get
+            {
+                foreach (var root in new[] { AssetsInstallRoot, PackageInstallRoot })
+                {
+                    var candidate = ProjectPath(root + CliTail);
+                    if (File.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+
+                return ProjectPath(AssetsInstallRoot + CliTail);
+            }
         }
 
         public static void EnableForMachine()
@@ -152,6 +189,7 @@ namespace PuerExecSuite
                 Environment.NewLine,
                 "[PuerExecSuite] status",
                 "  project        : " + ProjectRoot,
+                "  install root   : " + (IsInstalled ? InstallRoot : "(not installed)"),
                 "  enabled source : " + EnabledSource,
                 "  machine marker : " + ProjectPath(MachineEnabledPath) + (Exists(MachineEnabledPath) ? "  (present)" : "  (absent)"),
                 "  machine veto   : " + ProjectPath(MachineDisabledPath) + (Exists(MachineDisabledPath) ? "  (present)" : "  (absent)"),
