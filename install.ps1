@@ -112,7 +112,9 @@ function Install-FromSource {
     if ($isGitUrl) {
         if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'git not found on PATH' }
         & git clone --depth 1 $From $To
-        if ($LASTEXITCODE -ne 0) { throw "git clone failed: $From" }
+        if ($LASTEXITCODE -ne 0) {
+            throw "git clone failed: $From`n  If github.com over https is blocked here, retry with:`n    -Source git@github.com:Yogioo/unity-puer-exec-suite.git`n    -Source https://ghproxy.net/https://github.com/Yogioo/unity-puer-exec-suite.git`n  or download the zip and pass -Source <extracted folder>."
+        }
         return
     }
     if (-not (Test-Path -LiteralPath $From)) { throw "Source not found: $From" }

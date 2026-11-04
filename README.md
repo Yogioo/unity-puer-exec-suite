@@ -49,6 +49,16 @@ Unity 的 embedded package 机制会自动识别 `Packages/<带 package.json 的
 
 方式 C：下载 zip，解压后把目录改名成 `Packages/com.yogioo.puer-exec-suite`。
 
+> 国内网络打不开 `https://github.com` 时（`Connection was reset` / 超时），换 SSH 或镜像：
+>
+> ```bash
+> git clone git@github.com:Yogioo/unity-puer-exec-suite.git Packages/com.yogioo.puer-exec-suite
+> ./install.sh /path/to/MyGame --source git@github.com:Yogioo/unity-puer-exec-suite.git
+> ./install.sh /path/to/MyGame --source https://ghproxy.net/https://github.com/Yogioo/unity-puer-exec-suite.git
+> ```
+>
+> 整个包 24MB（仓库带 `.git` 约 39MB），SSH 下实测 7~10 秒。
+
 装完回到 Unity，等一次导入 + 编译（约 1~2 分钟，取决于机器），编辑器菜单里会出现 `Tools/Puer Exec Suite`。
 
 ## 三层开关（默认全关）

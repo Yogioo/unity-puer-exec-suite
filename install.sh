@@ -96,7 +96,14 @@ fi
 mkdir -p "$PROJECT/Packages"
 case "$SOURCE" in
   http*|git@*|*.git)
-    git clone --depth 1 "$SOURCE" "$TARGET"
+    if ! git clone --depth 1 "$SOURCE" "$TARGET"; then
+      echo >&2
+      echo "clone failed. If https://github.com is blocked on this network, retry with:" >&2
+      echo "  --source git@github.com:Yogioo/unity-puer-exec-suite.git" >&2
+      echo "  --source https://ghproxy.net/https://github.com/Yogioo/unity-puer-exec-suite.git" >&2
+      echo "or download the zip and point --source at the extracted folder." >&2
+      exit 1
+    fi
     ;;
   *)
     [ -d "$SOURCE" ] || { echo "source not found: $SOURCE" >&2; exit 2; }

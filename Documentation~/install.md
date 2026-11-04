@@ -54,6 +54,19 @@ git clone https://github.com/Yogioo/unity-puer-exec-suite.git Packages/com.yogio
 
 下载仓库 zip → 解压 → 目录改名成 `Packages/com.yogioo.puer-exec-suite`。没有 `.git`，`-Update` 用不了，重新下载覆盖即可。
 
+## 网络
+
+只影响「下载这一步」，装完之后运行期完全离线。
+
+| 情况 | 命令 |
+| --- | --- |
+| HTTPS 正常 | `git clone https://github.com/Yogioo/unity-puer-exec-suite.git ...` |
+| HTTPS 被墙（`Connection was reset` / 21s 超时） | `git clone git@github.com:Yogioo/unity-puer-exec-suite.git ...` |
+| 没有 SSH key | `--source https://ghproxy.net/https://github.com/Yogioo/unity-puer-exec-suite.git` |
+| 完全离线 | 先在能上网的机器下载 zip，`--source <解压目录>` |
+
+脚本 clone 失败时会把这几条打在 stderr 上，退出码 1，不会留下半个包目录。
+
 ## 装完检查
 
 1. 回到 Unity，等待 import + 编译（首次 1~2 分钟；`PapiV8.dll` 13MB，只是 import 不会编译）。
