@@ -137,21 +137,32 @@ namespace PuerExecSuite
                 padding = new RectOffset(12, 12, 10, 10),
             };
             _path = new GUIStyle(EditorStyles.label) { fontSize = _pointSize - 1, wordWrap = true };
-            _primaryButton = new GUIStyle(EditorStyles.miniButton)
-            {
-                fontSize = _pointSize,
-                fontStyle = FontStyle.Bold,
-                padding = new RectOffset(10, 10, 8, 8),
-            };
-            _button = new GUIStyle(EditorStyles.miniButton)
-            {
-                fontSize = _pointSize,
-                padding = new RectOffset(10, 10, 6, 6),
-            };
+            _primaryButton = ButtonStyle(_pointSize, true);
+            _button = ButtonStyle(_pointSize, false);
             _foldout = new GUIStyle(EditorStyles.foldout)
             {
                 fontSize = _pointSize + 1,
                 fontStyle = FontStyle.Bold,
+            };
+        }
+
+        private static GUIStyle ButtonStyle(int fontSize, bool bold)
+        {
+            // EditorStyles.miniButton carries fixedHeight = 16, which clips any content
+            // taller than that no matter what GUILayout.Height asks for. Start from the
+            // skin button and clear the fixed metrics so the rect we ask for is the rect
+            // the text gets.
+            return new GUIStyle(GUI.skin.button)
+            {
+                fontSize = fontSize,
+                fontStyle = bold ? FontStyle.Bold : FontStyle.Normal,
+                alignment = TextAnchor.MiddleCenter,
+                padding = new RectOffset(12, 12, 6, 6),
+                fixedHeight = 0f,
+                fixedWidth = 0f,
+                stretchHeight = true,
+                stretchWidth = true,
+                wordWrap = false,
             };
         }
 
@@ -245,32 +256,29 @@ namespace PuerExecSuite
         private void DrawPrimaryActions()
         {
             var active = PuerExecSuiteGate.IsActive;
-            var buttonHeight = _pointSize * 2.6f;
+            var height = _pointSize * 2.6f;
 
-            using (new EditorGUILayout.HorizontalScope())
+            using (new EditorGUI.DisabledScope(PuerExecSuiteGate.MachineEnabled))
             {
-                using (new EditorGUI.DisabledScope(PuerExecSuiteGate.MachineEnabled))
+                if (GUILayout.Button("开启（只影响我）", _primaryButton, GUILayout.Height(height)))
                 {
-                    if (GUILayout.Button("开启（只影响我）", _primaryButton, GUILayout.Height(buttonHeight)))
-                    {
-                        PuerExecSuiteGate.EnableForMachine();
-                    }
+                    PuerExecSuiteGate.EnableForMachine();
                 }
+            }
 
-                using (new EditorGUI.DisabledScope(PuerExecSuiteGate.MachineVeto))
+            using (new EditorGUI.DisabledScope(PuerExecSuiteGate.MachineVeto))
+            {
+                if (GUILayout.Button("关闭（只影响我）", _primaryButton, GUILayout.Height(height)))
                 {
-                    if (GUILayout.Button("关闭（只影响我）", _primaryButton, GUILayout.Height(buttonHeight)))
-                    {
-                        PuerExecSuiteGate.DisableForMachine();
-                    }
+                    PuerExecSuiteGate.DisableForMachine();
                 }
+            }
 
-                using (new EditorGUI.DisabledScope(active))
+            using (new EditorGUI.DisabledScope(active))
+            {
+                if (GUILayout.Button("立即激活本次会话", _primaryButton, GUILayout.Height(height)))
                 {
-                    if (GUILayout.Button("立即激活本次会话", _primaryButton, GUILayout.Height(buttonHeight)))
-                    {
-                        PuerExecSuiteGate.ActivateNow();
-                    }
+                    PuerExecSuiteGate.ActivateNow();
                 }
             }
 
@@ -330,11 +338,12 @@ namespace PuerExecSuite
             EditorGUILayout.LabelField("全队开关", _sectionTitle);
             EditorGUILayout.Space(2f);
 
+            var buttonHeight = _pointSize * 2.4f;
             using (new EditorGUILayout.HorizontalScope())
             {
                 using (new EditorGUI.DisabledScope(PuerExecSuiteGate.ProjectEnabled))
                 {
-                    if (GUILayout.Button("允许全队默认开启", _button, GUILayout.Height(_pointSize * 2.2f)))
+                    if (GUILayout.Button("允许全队默认开启", _button, GUILayout.Height(buttonHeight)))
                     {
                         PuerExecSuiteGate.EnableForProject();
                     }
@@ -342,7 +351,7 @@ namespace PuerExecSuite
 
                 using (new EditorGUI.DisabledScope(!PuerExecSuiteGate.ProjectEnabled))
                 {
-                    if (GUILayout.Button("撤销全队默认开启", _button, GUILayout.Height(_pointSize * 2.2f)))
+                    if (GUILayout.Button("撤销全队默认开启", _button, GUILayout.Height(buttonHeight)))
                     {
                         PuerExecSuiteGate.DisableForProject();
                     }
@@ -375,7 +384,7 @@ namespace PuerExecSuite
             var exists = File.Exists(cli);
             EditorGUILayout.LabelField(exists ? cli : "找不到 CLI（模块可能不完整）：\n" + cli, _path);
 
-            var buttonHeight = _pointSize * 2.2f;
+            var buttonHeight = _pointSize * 2.4f;
             using (new EditorGUILayout.HorizontalScope())
             {
                 using (new EditorGUI.DisabledScope(!exists))
@@ -391,12 +400,12 @@ namespace PuerExecSuite
                         EditorUtility.RevealInFinder(cli);
                     }
                 }
+            }
 
-                if (GUILayout.Button("复制冷启动命令", _button, GUILayout.Height(buttonHeight)))
-                {
-                    EditorGUIUtility.systemCopyBuffer = BuildColdStartCommand();
-                    ShowNotification(new GUIContent("冷启动命令已复制"));
-                }
+            if (GUILayout.Button("复制冷启动命令", _button, GUILayout.Height(buttonHeight)))
+            {
+                EditorGUIUtility.systemCopyBuffer = BuildColdStartCommand();
+                ShowNotification(new GUIContent("冷启动命令已复制"));
             }
 
             EditorGUILayout.Space(4f);
@@ -439,7 +448,7 @@ namespace PuerExecSuite
             EditorGUILayout.LabelField("项目开启　" + Mark(PuerExecSuiteGate.ProjectEnabledPath, PuerExecSuiteGate.ProjectEnabled), _path);
 
             EditorGUILayout.Space(6f);
-            if (GUILayout.Button("把完整状态打印到 Console", _button, GUILayout.Height(_pointSize * 2.2f)))
+            if (GUILayout.Button("把完整状态打印到 Console", _button, GUILayout.Height(_pointSize * 2.4f)))
             {
                 PuerExecSuiteGate.LogStatus();
             }

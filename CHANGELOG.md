@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2
+
+- **修按钮文字被裁掉**：`EditorStyles.miniButton` 自带 `fixedHeight = 16`，字号提到 16px 后内容溢出被 clip，`GUILayout.Height` 也救不回来。按钮样式改为从 `GUI.skin.button` 派生并显式清零 `fixedHeight/fixedWidth`。
+- 三个主按钮改为竖排全宽，agent 区按钮拆成两行；窄窗口 + 「特大」字号下也不会挤成一坨。
+
 ## 0.4.1
 
 - **控制面板字号可读性**：所有文字改用显式像素字号（基准 13px × 缩放），不再依赖 `miniLabel`（9px）；新增顶部「字号：标准 / 大 / 特大」开关，默认「大」，选择记在 `EditorPrefs`。
