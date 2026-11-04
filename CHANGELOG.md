@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2
+
+- 新增 `Documentation~/for-agents.md`：给 AI agent 的使用说明（探活、命令面、改完 C# 的验证循环、JS 脚本契约、长任务/日志/弹窗、危险动作、故障对照表）。两份 README 增加「让 AI 自己会用」一节，并给出可粘进工程 `AGENTS.md` 的片段。
+
 ## 0.6.1
 
 - `install.ps1` / `install.sh` 的 clone 与 `-Update` 增加 4 次重试（间隔 3 秒）：常见网络下到 github.com 的连接会「连上就断」（`Failed to connect ... after 21xxx ms`、`expected flush after ref listing`），重试比换配置有效。

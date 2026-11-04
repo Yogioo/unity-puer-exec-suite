@@ -130,6 +130,21 @@ $cli = "Assets\Editor\PuerExecSuite\Vendor\com.txcombo.unity-puer-exec\CLI~\unit
 
 `CLI~` 目录 Unity 不导入，只存在于磁盘上。不想硬编码路径就用 `PuerExecSuite.PuerExecSuiteGate.CliPath`（两种装法都会自动定位）。
 
+## 让 AI 自己会用
+
+装完只解决「能用」，不解决「AI 知道怎么用」。给 agent 的说明在
+[Documentation~/for-agents.md](Documentation~/for-agents.md)：探活方式、命令面、改完 C# 的验证循环、JS 脚本契约、长任务/日志/弹窗、以及常见故障对照表。
+
+工程侧建议把这行写进 `AGENTS.md`（或等价的项目指令文件），让 agent 一进工程就知道入口：
+
+```markdown
+## Unity 编辑器控制（puer-exec）
+模块在 Assets/Editor/PuerExecSuite（gitignore，默认关闭）。用法见该目录下
+Documentation~/for-agents.md。每条命令都带 --project-path <工程根>；改完 C# 用
+exec 或 wait-for-compile 等编译，再 get-compile-errors 确认 total: 0。
+通道没激活时不要用 CLI 冷启编辑器，先问人。
+```
+
 ## 要不要共享给同事
 
 默认不共享：安装脚本会把安装路径写进工程 `.gitignore`，你自己克隆、同事拉不到。
@@ -161,6 +176,7 @@ Editor/                PuerExecSuiteGate：启动开关 + 菜单 + 状态
 Vendor/                上游三件套原样 + 裁剪（见 UPSTREAM.md）
 install.ps1 install.sh 安装/更新/卸载（-Location assets|packages）
 Documentation~/        安装、开关、共享、上游同步
+  └─ for-agents.md     给 AI 的使用说明（让 agent 自己知道怎么用）
 UPSTREAM.md            上游版本与改动清单
 ```
 

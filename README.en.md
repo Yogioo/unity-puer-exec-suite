@@ -114,6 +114,21 @@ $cli = "Assets\Editor\PuerExecSuite\Vendor\com.txcombo.unity-puer-exec\CLI~\unit
 
 `CLI~` is skipped by Unity's importer. Prefer `PuerExecSuite.PuerExecSuiteGate.CliPath` over hardcoding — it resolves both locations.
 
+## So the agent actually knows how to use it
+
+Installing only makes it *work*. The agent-facing instructions live in
+[Documentation~/for-agents.md](Documentation~/for-agents.md) (Chinese): how to probe the channel, the command surface, the verify-after-editing loop, the JS script contract, long-running work / logs / modals, and a troubleshooting table.
+
+Point the project's own instruction file (`AGENTS.md` or equivalent) at it, e.g.:
+
+```markdown
+## Unity editor control (puer-exec)
+Module lives in Assets/Editor/PuerExecSuite (gitignored, off by default). See
+Documentation~/for-agents.md there. Always pass --project-path; after editing C#, wait with
+exec or wait-for-compile then require get-compile-errors total: 0. Never cold-launch the
+Editor through the CLI when the channel is not activated -- ask a human.
+```
+
 ## Share with the team or not
 
 Not by default: the installers add the install path to the project `.gitignore`. Committing the module, using a submodule, and keeping it local are compared in [Documentation~/sharing.md](Documentation~/sharing.md). Key point: **sharing the module is not sharing the opt-in** — a committed module still activates nothing until a marker exists.
