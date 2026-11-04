@@ -1,0 +1,26 @@
+{
+  "name": "com.yogioo.puer-exec-suite",
+  "displayName": "Puer Exec Suite",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "Editor-only, off-by-default Unity control surface for AI agents: a vendored PuerTS + unity-puer-exec stack packaged as one drop-in embedded package.",
+  "keywords": [
+    "editor",
+    "automation",
+    "agent",
+    "puerts",
+    "cli"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Yogioo",
+    "url": "https://github.com/Yogioo"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Yogioo/unity-puer-exec-suite.git"
+  },
+  "documentationUrl": "https://github.com/Yogioo/unity-puer-exec-suite/blob/main/Documentation~/install.md",
+  "changelogUrl": "https://github.com/Yogioo/unity-puer-exec-suite/blob/main/CHANGELOG.md",
+  "dependencies": {}
+}

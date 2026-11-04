@@ -1,0 +1,27 @@
+# Unity project leftovers (only relevant if the repo is opened as a project)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Generated IDE solutions / projects
+*.csproj
+*.sln
+*.slnx
+*.user
+
+# Unity settings assets that only make sense inside a project
+/ProjectSettings/
+/Assets/
+/Packages/manifest.json
+/Packages/packages-lock.json
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini

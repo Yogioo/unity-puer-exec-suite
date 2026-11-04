@@ -1,0 +1,19 @@
+# Keep the vendored upstream bytes stable across platforms: Unity packages are
+# checked out on Windows and macOS, and rewritten line endings create diff churn
+# plus a full reimport.
+* text=auto
+
+*.cs       text eol=lf
+*.meta     text eol=lf
+*.asmdef   text eol=lf
+*.json     text eol=lf
+*.md       text eol=lf
+*.mjs      text eol=lf
+*.cjs      text eol=lf
+*.sh       text eol=lf
+*.ps1      text eol=crlf
+
+*.dll      binary
+*.exe      binary
+*.pdb      binary
+*.a        binary
