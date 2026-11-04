@@ -82,6 +82,16 @@ git clone https://github.com/Yogioo/unity-puer-exec-suite.git Assets/Editor/Puer
 
 脚本 clone 失败时会把这几条打在 stderr 上，退出码 1，不会留下半个目录。
 
+**这条链路经常"连上就断"**（表现为 `Failed to connect ... after 21xxx ms`、`expected flush after ref listing`、或 SSH `Permission denied (publickey)` 间歇出现——后者不是密钥问题，同一把 key 连试三次会「拒/通/拒」）。所以 `install.ps1` / `install.sh` 的 clone 与 `-Update` 都带 4 次重试（间隔 3 秒），成功率从约 50% 提到接近必然。
+
+手工 `git push` / `git pull` 遇到同样的报错，重试即可：
+
+```bash
+for i in 1 2 3 4 5; do git push origin main && break; sleep 3; done
+```
+
+如果想让 https 走 `gh` 的凭据（不依赖 SSH agent），`gh auth setup-git` 一次即可。
+
 ## 装完检查
 
 1. 回到 Unity，等待 import + 编译（首次 1~2 分钟；`PapiV8.dll` 13MB，只是 import 不编译）。

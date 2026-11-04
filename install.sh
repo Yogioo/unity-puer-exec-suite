@@ -143,7 +143,10 @@ fi
 if [ "$UPDATE" = 1 ]; then
   for rel in "$ASSET_REL" "$PACKAGE_REL"; do
     if [ -d "$PROJECT/$rel/.git" ]; then
-      git -C "$PROJECT/$rel" pull --ff-only
+      for attempt in 1 2 3 4; do
+        git -C "$PROJECT/$rel" pull --ff-only && break
+        [ "$attempt" = 4 ] || { echo "  pull attempt $attempt failed, retrying..." >&2; sleep 3; }
+      done
       echo "  updated $rel"
     fi
   done
@@ -176,7 +179,14 @@ fi
 mkdir -p "$(dirname "$TARGET")"
 case "$SOURCE" in
   http*|git@*|*.git)
-    if ! git clone --depth 1 "$SOURCE" "$TARGET"; then
+    # github.com 在国内常见「连上就断」，重试几次比换配置有效
+    ok=0
+    for attempt in 1 2 3 4; do
+      git clone --depth 1 "$SOURCE" "$TARGET" && { ok=1; break; }
+      rm -rf "$TARGET"
+      [ "$attempt" = 4 ] || { echo "  clone attempt $attempt failed, retrying..." >&2; sleep 3; }
+    done
+    if [ "$ok" != 1 ]; then
       echo >&2
       echo "clone failed. If https://github.com is blocked on this network, retry with:" >&2
       echo "  --source git@github.com:Yogioo/unity-puer-exec-suite.git" >&2

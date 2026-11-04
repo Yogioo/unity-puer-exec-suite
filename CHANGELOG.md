@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- `install.ps1` / `install.sh` 的 clone 与 `-Update` 增加 4 次重试（间隔 3 秒）：常见网络下到 github.com 的连接会「连上就断」（`Failed to connect ... after 21xxx ms`、`expected flush after ref listing`），重试比换配置有效。
+- 文档补充网络故障的识别与手工重试写法。
+
 ## 0.6.0
 
 - **修 V8 起不来（`js_env_not_available` / `DllNotFoundException: PuertsCore`）**：Unity 的插件名→路径映射是启动时建立的，把模块装进正在运行的编辑器后，映射仍指向旧位置，所有 `DllImport("PuertsCore")` 全部失败（而 `PluginImporter` 仍报告 Editor 可用）。新增 `PuerExecNativeLoader`，在激活前按依赖顺序用绝对路径 `LoadLibraryExW` 载入 `PuertsCore → WSPPAddon → PapiV8`，裸名查找随即可命中已加载模块。

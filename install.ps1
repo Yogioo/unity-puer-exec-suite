@@ -195,8 +195,17 @@ function Install-FromSource {
     $isGitUrl = $From -match '^(https?|git|ssh)://' -or $From -match '^git@' -or $From -match '\.git$'
     if ($isGitUrl) {
         if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'git not found on PATH' }
-        & git clone --depth 1 $From $To
-        if ($LASTEXITCODE -ne 0) {
+        $cloned = $false
+        for ($attempt = 1; $attempt -le 4; $attempt++) {
+            & git clone --depth 1 $From $To
+            if ($LASTEXITCODE -eq 0) { $cloned = $true; break }
+            if (Test-Path -LiteralPath $To) { Remove-Item -LiteralPath $To -Recurse -Force }
+            if ($attempt -lt 4) {
+                Write-Host "  clone attempt $attempt failed, retrying..." -ForegroundColor DarkYellow
+                Start-Sleep -Seconds 3
+            }
+        }
+        if (-not $cloned) {
             throw "git clone failed: $From`n  If github.com over https is blocked here, retry with:`n    -Source git@github.com:Yogioo/unity-puer-exec-suite.git`n    -Source https://ghproxy.net/https://github.com/Yogioo/unity-puer-exec-suite.git`n  or download the zip and pass -Source <extracted folder>."
         }
         return
@@ -267,8 +276,16 @@ if ($Update) {
     foreach ($rel in @($AssetRel, $PackageRel)) {
         $path = Join-Path $root $rel
         if (-not (Test-Path -LiteralPath (Join-Path $path '.git'))) { continue }
-        & git -C $path pull --ff-only
-        if ($LASTEXITCODE -ne 0) { throw "git pull failed in $rel" }
+        $pulled = $false
+        for ($attempt = 1; $attempt -le 4; $attempt++) {
+            & git -C $path pull --ff-only
+            if ($LASTEXITCODE -eq 0) { $pulled = $true; break }
+            if ($attempt -lt 4) {
+                Write-Host "  pull attempt $attempt failed, retrying..." -ForegroundColor DarkYellow
+                Start-Sleep -Seconds 3
+            }
+        }
+        if (-not $pulled) { throw "git pull failed in $rel after 4 attempts" }
         Write-Host "  updated $rel"
     }
     Write-Host ''
