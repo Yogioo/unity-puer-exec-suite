@@ -72,7 +72,13 @@ namespace PuerExecSuite
 
         static PuerExecSuiteGate()
         {
-            EditorApplication.delayCall += () => AutoActivate(0);
+            EditorApplication.delayCall += () =>
+            {
+                // Preload first and unconditionally: a command-line activation never reaches
+                // AutoActivate's body, and the native map can still be stale after an install.
+                PuerExecNativeLoader.EnsureLoaded();
+                AutoActivate(0);
+            };
         }
 
         public static string ProjectRoot

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- **修 V8 起不来（`js_env_not_available` / `DllNotFoundException: PuertsCore`）**：Unity 的插件名→路径映射是启动时建立的，把模块装进正在运行的编辑器后，映射仍指向旧位置，所有 `DllImport("PuertsCore")` 全部失败（而 `PluginImporter` 仍报告 Editor 可用）。新增 `PuerExecNativeLoader`，在激活前按依赖顺序用绝对路径 `LoadLibraryExW` 载入 `PuertsCore → WSPPAddon → PapiV8`，裸名查找随即可命中已加载模块。
+- 预加载在域加载时就执行（命令行激活路径也覆盖），不再依赖 Unity 重启。
+- 新增菜单 `诊断原生库（V8 起不来时用）`：列出 Unity 认得的插件、每个 dll 的 PluginImporter 状态、进程内已加载的 puerts 原生模块、puerts 类型解析情况、预加载逐项结果与 `DllImport` 现场探测。支持用 `Temp/PuerExecSuite/diagnose` 标记文件触发一次（agent 无需点菜单）。
+
 ## 0.5.1
 
 - **修工作区残留未跟踪文件**：Unity 会给安装目录生成本身的 `Assets/Editor/PuerExecSuite.meta`，它位于模块目录之外，只 ignore 目录盖不住，`git status` 会一直挂一条 `??`。装脚本现在同时写目录与目录 meta 两行，`-Remove` 两行一起清，重复跑只补缺失项（幂等）。
