@@ -1,7 +1,7 @@
 {
   "name": "com.yogioo.puer-exec-suite",
   "displayName": "Puer Exec Suite",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "unity": "2022.3",
   "description": "Editor-only, off-by-default Unity control surface for AI agents: a vendored PuerTS + unity-puer-exec stack packaged as one drop-in embedded package.",
   "keywords": [
