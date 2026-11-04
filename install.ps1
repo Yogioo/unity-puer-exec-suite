@@ -89,22 +89,48 @@ function Resolve-ProjectRoot {
 
 function Write-Utf8NoBom {
     param([string]$Path, [string[]]$Lines)
-    $text = ($Lines -join "`r`n") + "`r`n"
+    $text = ($Lines -join [Environment]::NewLine) + [Environment]::NewLine
     [System.IO.File]::WriteAllText($Path, $text, (New-Object System.Text.UTF8Encoding($false)))
+}
+
+function Read-TextFile {
+    param([string]$Path)
+    # Explicit UTF-8: PowerShell 5.1's Get-Content defaults to ANSI and would mangle
+    # every non-ASCII comment in a UTF-8 .gitignore.
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $hasBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+    $text = (New-Object System.Text.UTF8Encoding($false)).GetString($bytes)
+    if ($hasBom) { $text = $text.Substring(1) }
+    [pscustomobject]@{
+        Text   = $text
+        HasBom = $hasBom
+        NewLine = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    }
 }
 
 function Add-IgnoreEntry {
     param([string]$Root, [string]$Relative)
     if ($NoIgnore) { return }
     $gitignore = Join-Path $Root '.gitignore'
-    $lines = @()
-    if (Test-Path -LiteralPath $gitignore) { $lines = @(Get-Content -LiteralPath $gitignore) }
     $entry = '/' + $Relative.Trim('/') + '/'
-    foreach ($line in $lines) {
-        if ($line.Trim() -eq $entry) { return }
+    $marker = '# puer-exec suite: per-machine, default off'
+
+    if (Test-Path -LiteralPath $gitignore) {
+        $existing = Read-TextFile -Path $gitignore
+        foreach ($line in ($existing.Text -split "`r?`n")) {
+            if ($line.Trim() -eq $entry) { return }
+        }
+        $block = ''
+        if ($existing.Text.Length -gt 0 -and -not $existing.Text.EndsWith("`n")) { $block += $existing.NewLine }
+        $block += $existing.NewLine + $marker + $existing.NewLine + $entry + $existing.NewLine
+        # Append only: never rewrite the file, so existing bytes and encoding survive.
+        $writer = New-Object System.IO.StreamWriter($gitignore, $true, (New-Object System.Text.UTF8Encoding($false)))
+        try { $writer.Write($block) } finally { $writer.Close() }
     }
-    $block = @('', '# puer-exec suite: per-machine, default off', $entry)
-    Write-Utf8NoBom -Path $gitignore -Lines ($lines + $block)
+    else {
+        [System.IO.File]::WriteAllText($gitignore, $marker + "`n" + $entry + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    }
+
     Write-Host "  ignore  $entry -> .gitignore"
 }
 
@@ -113,7 +139,8 @@ function Remove-IgnoreEntry {
     $gitignore = Join-Path $Root '.gitignore'
     if (-not (Test-Path -LiteralPath $gitignore)) { return }
     $entry = '/' + $Relative.Trim('/') + '/'
-    $lines = @(Get-Content -LiteralPath $gitignore)
+    $file = Read-TextFile -Path $gitignore
+    $lines = @($file.Text -split "`r?`n")
     $kept = New-Object System.Collections.Generic.List[string]
     foreach ($line in $lines) {
         if ($line.Trim() -eq $entry) { continue }
@@ -122,7 +149,9 @@ function Remove-IgnoreEntry {
     }
     while ($kept.Count -gt 0 -and $kept[$kept.Count - 1].Trim() -eq '') { $kept.RemoveAt($kept.Count - 1) }
     if ($kept.Count -ne $lines.Count) {
-        Write-Utf8NoBom -Path $gitignore -Lines $kept.ToArray()
+        $text = ($kept.ToArray() -join $file.NewLine) + $file.NewLine
+        $encoding = if ($file.HasBom) { New-Object System.Text.UTF8Encoding($true) } else { New-Object System.Text.UTF8Encoding($false) }
+        [System.IO.File]::WriteAllText($gitignore, $text, $encoding)
         Write-Host "  ignore  $entry removed from .gitignore"
     }
 }
