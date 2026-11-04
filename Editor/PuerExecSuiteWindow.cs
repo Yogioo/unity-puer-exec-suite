@@ -5,12 +5,9 @@ using UnityEngine;
 namespace PuerExecSuite
 {
     /// <summary>
-    /// Human-facing control panel for the vendored PuerExec stack: what the switch does,
-    /// what is on right now, and one button per action with a plain-language caption.
-    ///
-    /// Every style is built from an explicit pixel size instead of Unity's mini styles, and
-    /// the size itself is a persisted preference, because the default editor label size is
-    /// unreadable for a lot of people.
+    /// Control panel for the vendored PuerExec stack: current state on top, one button per
+    /// action, one short line of copy under each. Long explanations live behind a foldout so
+    /// the default view answers "is it on, and what do I click" in one glance.
     /// </summary>
     public sealed class PuerExecSuiteWindow : EditorWindow
     {
@@ -30,15 +27,13 @@ namespace PuerExecSuite
 
         private bool _showAdvanced;
 
-        private bool _showHowItWorks = true;
+        private bool _showAbout;
 
         private double _nextRepaint;
 
         private int _scaleIndex;
 
         private int _stylesScaleIndex = -1;
-
-        private GUIStyle _headline;
 
         private GUIStyle _sectionTitle;
 
@@ -61,7 +56,7 @@ namespace PuerExecSuite
         public static void Open()
         {
             var window = GetWindow<PuerExecSuiteWindow>(false, "Puer Exec Suite", true);
-            window.minSize = new Vector2(520f, 560f);
+            window.minSize = new Vector2(460f, 480f);
             window.Show();
         }
 
@@ -95,14 +90,17 @@ namespace PuerExecSuite
 
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
-            DrawStatusCard();
+            DrawStatus();
+            EditorGUILayout.Space(8f);
+            DrawActions();
+            EditorGUILayout.Space(8f);
+            DrawStateRows();
+            EditorGUILayout.Space(8f);
+            DrawTeamSwitch();
+            EditorGUILayout.Space(8f);
+            DrawCli();
             EditorGUILayout.Space(10f);
-            DrawPrimaryActions();
-            EditorGUILayout.Space(10f);
-            DrawSections();
-            EditorGUILayout.Space(10f);
-            DrawForAgents();
-            EditorGUILayout.Space(12f);
+            DrawAbout();
             DrawAdvanced();
 
             EditorGUILayout.EndScrollView();
@@ -118,7 +116,6 @@ namespace PuerExecSuite
             _stylesScaleIndex = _scaleIndex;
             _pointSize = Mathf.RoundToInt(BasePointSize * ScaleValues[_scaleIndex]);
 
-            _headline = new GUIStyle(EditorStyles.boldLabel) { fontSize = _pointSize + 3, wordWrap = true };
             _sectionTitle = new GUIStyle(EditorStyles.boldLabel) { fontSize = _pointSize + 1 };
             _body = new GUIStyle(EditorStyles.label) { fontSize = _pointSize, wordWrap = true, richText = true };
             _caption = new GUIStyle(EditorStyles.label)
@@ -139,19 +136,13 @@ namespace PuerExecSuite
             _path = new GUIStyle(EditorStyles.label) { fontSize = _pointSize - 1, wordWrap = true };
             _primaryButton = ButtonStyle(_pointSize, true);
             _button = ButtonStyle(_pointSize, false);
-            _foldout = new GUIStyle(EditorStyles.foldout)
-            {
-                fontSize = _pointSize + 1,
-                fontStyle = FontStyle.Bold,
-            };
+            _foldout = new GUIStyle(EditorStyles.foldout) { fontSize = _pointSize, fontStyle = FontStyle.Bold };
         }
 
         private static GUIStyle ButtonStyle(int fontSize, bool bold)
         {
-            // EditorStyles.miniButton carries fixedHeight = 16, which clips any content
-            // taller than that no matter what GUILayout.Height asks for. Start from the
-            // skin button and clear the fixed metrics so the rect we ask for is the rect
-            // the text gets.
+            // EditorStyles.miniButton carries fixedHeight = 16, which clips any content taller
+            // than that no matter what GUILayout.Height asks for.
             return new GUIStyle(GUI.skin.button)
             {
                 fontSize = fontSize,
@@ -180,19 +171,17 @@ namespace PuerExecSuite
                 }
 
                 GUILayout.FlexibleSpace();
-                GUILayout.Label("工具菜单：Tools ▸ Puer Exec Suite", EditorStyles.miniLabel);
             }
 
             EditorGUILayout.Space(4f);
         }
 
-        private void DrawStatusCard()
+        private void DrawStatus()
         {
             if (!PuerExecSuiteGate.IsInstalled)
             {
                 DrawCallout(
-                    "找不到模块本体。\n\n它应该位于 Assets/Editor/PuerExecSuite 或 Packages/com.yogioo.puer-exec-suite。\n"
-                    + "重装命令（在工程根目录执行）：\n"
+                    "找不到模块\n\n应该在 Assets/Editor/PuerExecSuite。重装（工程根目录）：\n"
                     + "git clone https://github.com/Yogioo/unity-puer-exec-suite.git Assets/Editor/PuerExecSuite",
                     MessageType.Error);
                 return;
@@ -203,40 +192,38 @@ namespace PuerExecSuite
             var port = PuerExecSuiteGate.EndpointPort;
 
             string headline;
-            string detail;
+            string hint;
             MessageType type;
 
             if (enabled && active)
             {
-                headline = "已开启，控制端口正在监听" + (port > 0 ? "（127.0.0.1:" + port + "）" : string.Empty);
-                detail = "AI agent / CLI 现在可以驱动这个编辑器。";
+                headline = "已开启" + (port > 0 ? " · 端口 " + port + " 在监听" : " · 正在监听");
+                hint = "AI 现在可以连上这个编辑器。";
                 type = MessageType.Info;
             }
             else if (enabled && !active)
             {
-                headline = "已开启，但本次会话还没激活";
-                detail = "点下面的「立即激活本次会话」，或者重新打开一次编辑器。";
+                headline = "已开启 · 本次还没生效";
+                hint = "点下面的「立即激活本次会话」。";
                 type = MessageType.Warning;
             }
-            else if (!enabled && active)
+            else if (active)
             {
-                headline = "已关闭，但本次会话的控制端口还开着";
-                detail = "上游的激活是会话级的，重启编辑器后才会真正释放。";
+                headline = "已关闭 · 但端口还开着";
+                hint = "重启编辑器后才会真的关掉。";
                 type = MessageType.Warning;
             }
             else
             {
-                headline = "已关闭（默认状态）";
-                detail = "没有任何端口在监听，CLI 连不上，对这台机器没有任何影响。";
+                headline = "已关闭";
+                hint = "没有任何端口在监听。";
                 type = MessageType.None;
             }
 
-            DrawCallout(headline + "\n" + detail, type);
+            DrawCallout(headline + "\n" + hint, type);
 
             EditorGUILayout.LabelField(
-                "开关来源：" + DescribeSource()
-                + "　　上游版本：unity-puer-exec "
-                + (string.IsNullOrEmpty(PuerExecSuiteGate.BridgeVersion) ? "?" : PuerExecSuiteGate.BridgeVersion),
+                "来源：" + DescribeSource() + "　版本：" + (string.IsNullOrEmpty(PuerExecSuiteGate.BridgeVersion) ? "?" : PuerExecSuiteGate.BridgeVersion),
                 _caption);
         }
 
@@ -245,17 +232,16 @@ namespace PuerExecSuite
             switch (PuerExecSuiteGate.EnabledSource)
             {
                 case "machine":
-                    return "本机开启（只影响这台电脑）";
+                    return "本机";
                 case "project":
-                    return "项目设置开启（提交后影响全队）";
+                    return "项目设置";
                 default:
-                    return PuerExecSuiteGate.MachineVeto ? "本机否决（即使项目开启也关着）" : "未开启";
+                    return PuerExecSuiteGate.MachineVeto ? "本机否决" : "未开启";
             }
         }
 
-        private void DrawPrimaryActions()
+        private void DrawActions()
         {
-            var active = PuerExecSuiteGate.IsActive;
             var height = _pointSize * 2.6f;
 
             using (new EditorGUI.DisabledScope(PuerExecSuiteGate.MachineEnabled))
@@ -266,6 +252,8 @@ namespace PuerExecSuite
                 }
             }
 
+            EditorGUILayout.LabelField("点一次，以后每次打开 Unity 都自动生效。", _caption);
+
             using (new EditorGUI.DisabledScope(PuerExecSuiteGate.MachineVeto))
             {
                 if (GUILayout.Button("关闭（只影响我）", _primaryButton, GUILayout.Height(height)))
@@ -274,7 +262,9 @@ namespace PuerExecSuite
                 }
             }
 
-            using (new EditorGUI.DisabledScope(active))
+            EditorGUILayout.LabelField("本机不再自动打开。", _caption);
+
+            using (new EditorGUI.DisabledScope(PuerExecSuiteGate.IsActive))
             {
                 if (GUILayout.Button("立即激活本次会话", _primaryButton, GUILayout.Height(height)))
                 {
@@ -282,68 +272,59 @@ namespace PuerExecSuite
                 }
             }
 
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField(
-                "<b>开启（只影响我）</b>：在这台电脑上放开控制通道，写的是 UserSettings/ 下的标记文件，"
-                + "不进 git。点一次就够，之后每次打开这个工程都会自动激活。\n"
-                + "<b>关闭（只影响我）</b>：本机否决，优先级高于下面「允许全队默认开启」；"
-                + "已经打开的端口要重启编辑器才释放。\n"
-                + "<b>立即激活本次会话</b>：不改变任何开关，只是让当前这个编辑器把端口开起来。",
-                _caption);
+            EditorGUILayout.LabelField("只开这一次，不改任何设置。", _caption);
         }
 
-        private void DrawSections()
+        private void DrawStateRows()
         {
-            _showHowItWorks = EditorGUILayout.Foldout(_showHowItWorks, "这是什么？为什么要三层开关？", true, _foldout);
-            if (_showHowItWorks)
+            EditorGUILayout.LabelField("当前状态", _sectionTitle);
+
+            DrawStateRow(
+                "模块",
+                PuerExecSuiteGate.InstallRoot,
+                string.Empty);
+
+            DrawStateRow(
+                "自动开启",
+                PuerExecSuiteGate.MachineEnabled
+                    ? "是（本机）"
+                    : PuerExecSuiteGate.ProjectEnabled && !PuerExecSuiteGate.MachineVeto
+                        ? "是（项目设置）"
+                        : "否",
+                string.Empty);
+
+            DrawStateRow(
+                "端口",
+                PuerExecSuiteGate.IsActive
+                    ? (PuerExecSuiteGate.EndpointPort > 0 ? "监听中（" + PuerExecSuiteGate.EndpointPort + "）" : "监听中")
+                    : "未监听",
+                string.Empty);
+        }
+
+        private void DrawStateRow(string label, string value, string note)
+        {
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
             {
-                DrawCallout(
-                    "这是给 AI agent 用的编辑器控制通道：本机回环上一个 HTTP 端口，CLI 通过它执行 C#/JS、"
-                    + "读编译错误、跑测试。\n\n"
-                    + "它不是常开服务，三层全部默认关闭：\n"
-                    + "① 模块不在工程里 → 什么都不编译；\n"
-                    + "② 没有开启标记 → 编辑器启动时不激活；\n"
-                    + "③ 没有启动参数 → 进程不监听端口。\n\n"
-                    + "所以把它提交进 git 也没关系：同事拉到了模块，也依然什么都没有发生。",
-                    MessageType.None);
-                EditorGUILayout.Space(6f);
+                GUILayout.Label(label, _body, GUILayout.Width(_pointSize * 5f));
+                GUILayout.Label(value, _body);
             }
 
-            EditorGUILayout.LabelField("开关现状", _sectionTitle);
-            EditorGUILayout.Space(2f);
+            if (!string.IsNullOrEmpty(note))
+            {
+                EditorGUILayout.LabelField(note, _caption);
+            }
+        }
 
-            DrawRow(
-                "① 模块本体",
-                PuerExecSuiteGate.InstallRoot,
-                "目录在，代码会编译（仅编辑器，不进玩家包体）。删掉目录就是卸载。");
-
-            DrawRow(
-                "② 启动时激活",
-                PuerExecSuiteGate.MachineEnabled
-                    ? "已开启（本机）"
-                    : PuerExecSuiteGate.ProjectEnabled && !PuerExecSuiteGate.MachineVeto
-                        ? "已开启（项目设置）"
-                        : "未开启",
-                "决定「每次打开工程要不要自动开端口」。本机开启写 UserSettings/，项目开启写 ProjectSettings/。");
-
-            DrawRow(
-                "③ 本次会话端口",
-                PuerExecSuiteGate.IsActive
-                    ? "监听中" + (PuerExecSuiteGate.EndpointPort > 0 ? "（:" + PuerExecSuiteGate.EndpointPort + "）" : string.Empty)
-                    : "未监听",
-                "真正的端口状态。用「立即激活本次会话」或启动参数 -unityPuerExecControl 打开。");
-
-            EditorGUILayout.Space(10f);
-
-            EditorGUILayout.LabelField("全队开关", _sectionTitle);
-            EditorGUILayout.Space(2f);
+        private void DrawTeamSwitch()
+        {
+            EditorGUILayout.LabelField("全队默认开启", _sectionTitle);
 
             var buttonHeight = _pointSize * 2.4f;
             using (new EditorGUILayout.HorizontalScope())
             {
                 using (new EditorGUI.DisabledScope(PuerExecSuiteGate.ProjectEnabled))
                 {
-                    if (GUILayout.Button("允许全队默认开启", _button, GUILayout.Height(buttonHeight)))
+                    if (GUILayout.Button("打开", _button, GUILayout.Height(buttonHeight)))
                     {
                         PuerExecSuiteGate.EnableForProject();
                     }
@@ -351,51 +332,36 @@ namespace PuerExecSuite
 
                 using (new EditorGUI.DisabledScope(!PuerExecSuiteGate.ProjectEnabled))
                 {
-                    if (GUILayout.Button("撤销全队默认开启", _button, GUILayout.Height(buttonHeight)))
+                    if (GUILayout.Button("撤销", _button, GUILayout.Height(buttonHeight)))
                     {
                         PuerExecSuiteGate.DisableForProject();
                     }
                 }
             }
 
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField(
-                "<b>允许全队默认开启</b>：写 ProjectSettings/PuerExecSuite/enabled，把它提交进仓库后，"
-                + "所有人拉下来打开编辑器都会自动激活。不想被开的人在自己机器上点「关闭（只影响我）」。\n"
-                + "<b>撤销全队默认开启</b>：删掉那个项目级标记。",
-                _caption);
+            EditorGUILayout.LabelField("会写进项目设置，提交后其他人拉下来也会自动生效。", _caption);
         }
 
-        private void DrawRow(string label, string value, string explanation)
+        private void DrawCli()
         {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField(label + "：" + value, _body);
-            EditorGUILayout.LabelField(explanation, _caption);
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(4f);
-        }
-
-        private void DrawForAgents()
-        {
-            EditorGUILayout.LabelField("给 AI agent / CLI 用", _sectionTitle);
-            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("AI 调用", _sectionTitle);
 
             var cli = PuerExecSuiteGate.CliPath;
             var exists = File.Exists(cli);
-            EditorGUILayout.LabelField(exists ? cli : "找不到 CLI（模块可能不完整）：\n" + cli, _path);
+            EditorGUILayout.LabelField(exists ? cli : "找不到 CLI：\n" + cli, _path);
 
             var buttonHeight = _pointSize * 2.4f;
             using (new EditorGUILayout.HorizontalScope())
             {
                 using (new EditorGUI.DisabledScope(!exists))
                 {
-                    if (GUILayout.Button("复制 CLI 路径", _button, GUILayout.Height(buttonHeight)))
+                    if (GUILayout.Button("复制路径", _button, GUILayout.Height(buttonHeight)))
                     {
                         EditorGUIUtility.systemCopyBuffer = cli;
-                        ShowNotification(new GUIContent("CLI 路径已复制"));
+                        ShowNotification(new GUIContent("已复制"));
                     }
 
-                    if (GUILayout.Button("打开所在文件夹", _button, GUILayout.Height(buttonHeight)))
+                    if (GUILayout.Button("打开文件夹", _button, GUILayout.Height(buttonHeight)))
                     {
                         EditorUtility.RevealInFinder(cli);
                     }
@@ -405,14 +371,10 @@ namespace PuerExecSuite
             if (GUILayout.Button("复制冷启动命令", _button, GUILayout.Height(buttonHeight)))
             {
                 EditorGUIUtility.systemCopyBuffer = BuildColdStartCommand();
-                ShowNotification(new GUIContent("冷启动命令已复制"));
+                ShowNotification(new GUIContent("已复制"));
             }
 
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField(
-                "冷启动命令会用独立日志文件重新打开这个工程，agent 才能按字节读取日志；"
-                + "从 Unity Hub 手点开的编辑器做不到日志隔离。",
-                _caption);
+            EditorGUILayout.LabelField("冷启动命令能带上独立日志，方便 AI 读日志。", _caption);
         }
 
         private static string BuildColdStartCommand()
@@ -424,9 +386,21 @@ namespace PuerExecSuite
                    + "\"";
         }
 
+        private void DrawAbout()
+        {
+            _showAbout = EditorGUILayout.Foldout(_showAbout, "它是干什么的", true, _foldout);
+            if (_showAbout)
+            {
+                DrawCallout(
+                    "给 AI 用的编辑器控制口。AI 通过它读编译错误、跑 JS、跑测试。\n"
+                    + "默认全关：不开就没有任何端口，等于没装。",
+                    MessageType.None);
+            }
+        }
+
         private void DrawAdvanced()
         {
-            _showAdvanced = EditorGUILayout.Foldout(_showAdvanced, "详细信息（排查问题用）", true, _foldout);
+            _showAdvanced = EditorGUILayout.Foldout(_showAdvanced, "详细信息", true, _foldout);
             if (!_showAdvanced)
             {
                 return;
@@ -434,21 +408,16 @@ namespace PuerExecSuite
 
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.LabelField("工程　　" + PuerExecSuiteGate.ProjectRoot, _path);
-            EditorGUILayout.LabelField("安装位置　" + PuerExecSuiteGate.InstallRoot, _path);
             EditorGUILayout.LabelField(
-                "端点文件　" + PuerExecSuiteGate.EndpointPath
-                + (PuerExecSuiteGate.EndpointPublished ? "　（已发布）" : "　（未发布）"),
+                "端点　　" + PuerExecSuiteGate.EndpointPath
+                + (PuerExecSuiteGate.EndpointPublished ? "（已发布）" : "（未发布）"),
                 _path);
-            EditorGUILayout.LabelField("生效来源　" + PuerExecSuiteGate.EnabledSource, _path);
-
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField("标记文件（● 存在即生效）", _body);
             EditorGUILayout.LabelField("本机开启　" + Mark(PuerExecSuiteGate.MachineEnabledPath, PuerExecSuiteGate.MachineEnabled), _path);
             EditorGUILayout.LabelField("本机否决　" + Mark(PuerExecSuiteGate.MachineDisabledPath, PuerExecSuiteGate.MachineVeto), _path);
             EditorGUILayout.LabelField("项目开启　" + Mark(PuerExecSuiteGate.ProjectEnabledPath, PuerExecSuiteGate.ProjectEnabled), _path);
 
             EditorGUILayout.Space(6f);
-            if (GUILayout.Button("把完整状态打印到 Console", _button, GUILayout.Height(_pointSize * 2.4f)))
+            if (GUILayout.Button("打印完整状态到 Console", _button, GUILayout.Height(_pointSize * 2.4f)))
             {
                 PuerExecSuiteGate.LogStatus();
             }
