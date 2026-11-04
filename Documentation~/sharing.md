@@ -33,3 +33,32 @@ ProjectSettings/PuerExecSuite/enabled  提交后对全队生效
 对 Idle_Gunner 这类正在多人协作、要出包的工程：**A（默认不共享）+ 想让团队用就选 B/C 但别提交 project marker**。理由是 24MB 二进制在仓库里会一直跟着历史走，而升级本模块的动因（上游 release）跟工程代码的节奏无关，各走各的更清爽。真需要「一条命令配好环境」，把这行写进工程的 onboarding 文档比塞进仓库有效。
 
 包如果走 C（子模块），记得 Unity 侧无感知：embedded package 的判定只看目录里有没有 `package.json`，是 submodule 也一样。
+
+## 一个必然的副作用：`packages-lock.json` 会多一条
+
+第一次装入后，UPM 会自己往 `Packages/packages-lock.json` 追加：
+
+```json
+"com.yogioo.puer-exec-suite": {
+  "version": "file:com.yogioo.puer-exec-suite",
+  "depth": 0,
+  "source": "embedded",
+  "dependencies": {}
+}
+```
+
+这是 UPM 对 embedded package 的正常记账，不是配置错误。它的含义是先有鸡后有蛋：「包在 `Packages/` 下」这件事 Unity 要记下来，而它只记在 lock 里。
+
+怎么处理：
+
+| 做法 | 结果 | 代价 |
+| --- | --- | --- |
+| **提交（推荐）** | 有包的人 lock 干净 | 没装的人首次开 Unity 时这一条会被 UPM 删掉，他们的 lock 脏一次 |
+| `git update-index --skip-worktree Packages/packages-lock.json` | 本机彻底看不见 | 别人往 lock 里加/删其它包时，pull 会因 skip-worktree 撞车，需要先 `--no-skip-worktree` |
+| 每次 `git checkout -- Packages/packages-lock.json` | 不改别人的 lock | 反复出现的噪音，容易误夹杂进提交 |
+
+关键前提：`manifest.json` 里**没有**这个包的依赖声明，所以这条 lock 记录对别人是惰性数据——缺包时 Unity 只是把这条删掉，不会报错、不影响构建。属性上它更接近「我这台机器装了」的备注。
+
+因此推荐：**提交它**，并在团队里约定「没装这个包的人顺手删掉那一条的 diff 不要提交」；若团队对 lock 的完整性有洁癖，就退回 `skip-worktree`（本项目级的局部隐身，跟当年 DigitDoor 的做法一致）。
+
+如果反过来想知道「能不能让这条记录压根不产生」：唯一彻底的办法是不用 embedded package，改在 `manifest.json` 里写 git 依赖（`"com.yogioo.puer-exec-suite": "https://github.com/Yogioo/unity-puer-exec-suite.git"`）。那条 lock 记录会变成 `source: git`、对所有人一致，代价是：包对所有人**都装上了**（开启与否仍由 marker 决定），且 UPM 拉 git 依赖走 https——被墙的机器解析不了。
