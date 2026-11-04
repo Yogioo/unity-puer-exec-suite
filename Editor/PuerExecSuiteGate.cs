@@ -133,6 +133,7 @@ namespace PuerExecSuite
             WriteFlag(MachineEnabledPath);
             DeleteFlag(MachineDisabledPath);
             AutoActivate(0);
+            Debug.Log("[PuerExecSuite] Enabled on this machine. Endpoint: " + (IsActive ? "listening." : "not listening."));
         }
 
         public static void DisableForMachine()
@@ -158,10 +159,26 @@ namespace PuerExecSuite
             DeleteFlag(ProjectEnabledPath);
         }
 
+        [MenuItem(MenuRoot + "Enable On This Machine", true, 10)]
+        private static bool ValidateEnableForMachine()
+        {
+            var on = EnabledSource == "machine";
+            Menu.SetChecked(MenuRoot + "Enable On This Machine", on);
+            return !on;
+        }
+
         [MenuItem(MenuRoot + "Enable On This Machine", false, 10)]
         private static void MenuEnableForMachine()
         {
             EnableForMachine();
+        }
+
+        [MenuItem(MenuRoot + "Disable On This Machine", true, 11)]
+        private static bool ValidateDisableForMachine()
+        {
+            var vetoed = Exists(MachineDisabledPath);
+            Menu.SetChecked(MenuRoot + "Disable On This Machine", vetoed);
+            return !vetoed;
         }
 
         [MenuItem(MenuRoot + "Disable On This Machine", false, 11)]
@@ -170,10 +187,24 @@ namespace PuerExecSuite
             DisableForMachine();
         }
 
+        [MenuItem(MenuRoot + "Enable For This Project (committed)", true, 12)]
+        private static bool ValidateEnableForProject()
+        {
+            var on = Exists(ProjectEnabledPath);
+            Menu.SetChecked(MenuRoot + "Enable For This Project (committed)", on);
+            return !on;
+        }
+
         [MenuItem(MenuRoot + "Enable For This Project (committed)", false, 12)]
         private static void MenuEnableForProject()
         {
             EnableForProject();
+        }
+
+        [MenuItem(MenuRoot + "Disable For This Project (committed)", true, 13)]
+        private static bool ValidateDisableForProject()
+        {
+            return Exists(ProjectEnabledPath);
         }
 
         [MenuItem(MenuRoot + "Disable For This Project (committed)", false, 13)]
@@ -194,9 +225,17 @@ namespace PuerExecSuite
                 "  machine marker : " + ProjectPath(MachineEnabledPath) + (Exists(MachineEnabledPath) ? "  (present)" : "  (absent)"),
                 "  machine veto   : " + ProjectPath(MachineDisabledPath) + (Exists(MachineDisabledPath) ? "  (present)" : "  (absent)"),
                 "  project marker : " + ProjectPath(ProjectEnabledPath) + (Exists(ProjectEnabledPath) ? "  (present)" : "  (absent)"),
-                "  endpoint       : " + (IsActive ? "listening" : "not listening"),
+                "  endpoint       : " + (IsActive ? "listening" : "not listening")
+                + "  " + ProjectPath("Temp/UnityPuerExec/endpoint.json")
+                + (Exists("Temp/UnityPuerExec/endpoint.json") ? "  (published)" : "  (absent)"),
                 "  cli            : " + CliPath + (File.Exists(CliPath) ? string.Empty : "  (missing)"));
             Debug.Log(report);
+        }
+
+        [MenuItem(MenuRoot + "Activate Now (this session)", true, 21)]
+        private static bool ValidateActivateNow()
+        {
+            return !IsActive;
         }
 
         [MenuItem(MenuRoot + "Activate Now (this session)", false, 21)]

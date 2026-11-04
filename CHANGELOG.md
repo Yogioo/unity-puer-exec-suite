@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1
+
+- **修 B 装法（Assets 位置）下 CLI 无法握手**：`UnityPuerExecServer.ResolveBridgeVersion` 在非 package 安装时拿到 null，上报空版本 → CLI 返回 `version_mismatch / bridge_version_unknown` 并拒绝执行。改为带编译期常量兜底（见 UPSTREAM.md 改动 5）。
+- 菜单补 validate 函数与勾选状态：Enable/Disable On This Machine、Enable/Disable For This Project、(disabled) Activate Now 现在会随状态变化，不再「点了看不出区别」。
+- `Enable On This Machine` 的日志改为带端点状态（`Endpoint: listening / not listening`）。
+- `Status` 增加 `install root` 与 `endpoint.json` 是否已发布。
+- `install.ps1`：不再整文件重写 `.gitignore`（PS 5.1 默认 ANSI 读取会把 UTF-8 中文注释写坏），改为显式 UTF-8 追加，删除时保留 BOM 与换行风格。
+
 ## 0.3.0
 
 - 新增 **`Assets/Editor/PuerExecSuite` 装法并设为默认**：UPM 完全不参与，`Packages/packages-lock.json` 不再被写入或删除，团队里任何人的 `git status` 都不会因本模块变脏。原 `Packages/<name>` 装法保留为 `-Location packages` / `--location packages`。

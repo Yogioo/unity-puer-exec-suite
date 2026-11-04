@@ -21,6 +21,8 @@
 1. 目录摊平到 `Vendor/<包名>/`；
 2. 删除非 Windows Editor 平台的原生插件（见 [UPSTREAM.md](UPSTREAM.md)）；
 3. `com.tencent.puerts.core` 与 `com.tencent.puerts.v8` 的 asmdef `includePlatforms` 由 `[]` 改为 `["Editor"]`；
-4. 合并 `com.tencent.puerts.v8.asmdef` 中重复的 `"references"` 键。
+4. 合并 `com.tencent.puerts.v8.asmdef` 中重复的 `"references"` 键；
+5. `UnityPuerExecServer.ResolveBridgeVersion` 增加编译期版本常量兜底（非 package 安装时
+   `PackageInfo` 为 null，上游会上报空版本导致 CLI 拒绝握手）。
 
 升级上游时按 `Documentation~/upstream-sync.md` 重做上述步骤，不需要 fork。

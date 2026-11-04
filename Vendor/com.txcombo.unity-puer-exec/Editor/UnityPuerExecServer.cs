@@ -176,9 +176,15 @@ namespace UnityPuerExec
 
         // Package identity for the Editor half of the product. Resolved once during
         // [InitializeOnLoad] (main thread) because PackageInfo is a main-thread editor
-        // API, then read from the listener thread when answering /health. Empty when
-        // the assembly is not package-installed.
+        // API, then read from the listener thread when answering /health.
+        //
+        // PuerExec Suite patch #5 (see UPSTREAM.md): the suite can be installed as plain
+        // project code under Assets/ instead of Packages/, where PackageInfo is null and an
+        // empty version makes the CLI refuse the handshake (bridge_version_unknown). Fall
+        // back to the version this build ships with; bump it whenever UPSTREAM.md does.
         private static readonly string bridgeVersion = ResolveBridgeVersion();
+
+        private const string SuiteFallbackBridgeVersion = "0.11.0";
         private static string cachedConsoleLogPath = "";
         // Read from SessionState in the static constructor, which runs once per
         // domain -- so a domain reload resumes the prior value instead of resetting.
@@ -293,12 +299,17 @@ namespace UnityPuerExec
                 var info = UnityEditor.PackageManager.PackageInfo.FindForAssembly(
                     typeof(UnityPuerExecServer).Assembly
                 );
-                return info == null ? "" : (info.version ?? "");
+                var version = info == null ? null : info.version;
+                if (!string.IsNullOrEmpty(version))
+                {
+                    return version;
+                }
             }
             catch
             {
-                return "";
             }
+
+            return SuiteFallbackBridgeVersion;
         }
 
         internal static bool IsMainThread => Thread.CurrentThread.ManagedThreadId == mainThreadId;

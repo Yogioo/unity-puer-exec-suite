@@ -50,6 +50,37 @@ com.tencent.puerts.v8/Plugins/x86_64/PapiV8.dll
 
 三个包被放进本模块的 `Vendor/` 子目录；它们的 `package.json` 在模块视角下只是普通资源，不会被当成独立包解析。默认装法整个模块落在 `Assets/Editor/PuerExecSuite`（UPM 完全不参与），也可选 `Packages/com.yogioo.puer-exec-suite`（UPM 视为 embedded package，此时本目录里的 `package.json` 才是清单）。副作用只有一个：PuerTS 的 IL2Cpp 代码生成菜单硬编码了 `Path.GetFullPath("Packages/com.tencent.puerts.core/")`，在本模块下不可用（本模块不使用 IL2Cpp 生成）。
 
+### 5. 版本上报兜底（`UnityPuerExecServer.ResolveBridgeVersion`）
+
+上游用 `PackageInfo.FindForAssembly` 取自己的包版本上报给 CLI 做握手校验。默认装法（`Assets/Editor/PuerExecSuite`）不是 package，`PackageInfo` 返回 null → 上报空版本 → CLI 直接拒绝：
+
+```json
+{"ok": false, "status": "version_mismatch",
+ "error": "The Unity bridge ... reported no version, so it cannot be verified against CLI version 0.11.0.",
+ "version_mismatch": {"guard": "bridge_version_unknown", "observed_version": null}}
+```
+
+改法是加一个编译期常量兜底（`Packages/` 装法下行为不变，仍以 `package.json` 的版本为准）：
+
+```csharp
+private const string SuiteFallbackBridgeVersion = "0.11.0";
+
+private static string ResolveBridgeVersion()
+{
+    try
+    {
+        var info = PackageInfo.FindForAssembly(typeof(UnityPuerExecServer).Assembly);
+        var version = info == null ? null : info.version;
+        if (!string.IsNullOrEmpty(version)) return version;
+    }
+    catch { }
+
+    return SuiteFallbackBridgeVersion;
+}
+```
+
+**同步上游时必须检查这个常量**：它要和 `Vendor/com.txcombo.unity-puer-exec/package.json` 的 `version` 以及随包附带的 CLI（`CLI~/unity-puer-exec.exe --version`）一致，否则 CLI 仍然会拒绝。
+
 ## 为什么不用 UPM 依赖直接引用
 
 `package.json` 里写 `"com.tencent.puerts.core": "https://github.com/Tencent/puerts.git?path=unity/upms/core"` 是可行的，但 UPM 会为此把整个 `Tencent/puerts` 仓库拉进 `Library/PackageCache`（含 unreal 源码与全部平台二进制，体量远超本模块的 24MB），首次导入明显更慢，离线也不可用。并且 `com.txcombo.unity-puer-exec` 还需要 OpenUPM scoped registry 才能按版本号解析——而那正是本模块想省掉的 manifest 改动。
