@@ -72,27 +72,40 @@ echo
 
 add_ignore() {
   [ "$NOIGNORE" = 1 ] && return 0
-  ENTRY="/$1/"
   touch "$PROJECT/.gitignore"
-  grep -qxF "$ENTRY" "$PROJECT/.gitignore" && return 0
-  if [ -s "$PROJECT/.gitignore" ]; then
-    printf '\n# puer-exec suite: per-machine, default off\n%s\n' "$ENTRY" >> "$PROJECT/.gitignore"
-  else
-    printf '# puer-exec suite: per-machine, default off\n%s\n' "$ENTRY" >> "$PROJECT/.gitignore"
-  fi
-  echo "  ignore  $ENTRY -> .gitignore"
+  changed=0
+  for rel in "$@"; do
+    for entry in "/$rel/" "/$rel.meta"; do
+      if ! grep -qxF "$entry" "$PROJECT/.gitignore"; then
+        if grep -qxF '# puer-exec suite: per-machine, default off' "$PROJECT/.gitignore"; then
+          printf '%s
+' "$entry" >> "$PROJECT/.gitignore"
+        elif [ -s "$PROJECT/.gitignore" ]; then
+          printf '\n# puer-exec suite: per-machine, default off\n%s\n' "$entry" >> "$PROJECT/.gitignore"
+        else
+          printf '# puer-exec suite: per-machine, default off\n%s\n' "$entry" >> "$PROJECT/.gitignore"
+        fi
+        echo "  ignore  $entry -> .gitignore"
+        changed=1
+      fi
+    done
+  done
+  return 0
 }
 
 drop_ignore() {
   [ -f "$PROJECT/.gitignore" ] || return 0
-  ENTRY="/$1/"
-  if grep -qxF "$ENTRY" "$PROJECT/.gitignore"; then
-    grep -vxF "$ENTRY" "$PROJECT/.gitignore" \
-      | grep -vxF '# puer-exec suite: per-machine, default off' \
-      > "$PROJECT/.gitignore.tmp"
-    mv "$PROJECT/.gitignore.tmp" "$PROJECT/.gitignore"
-    echo "  ignore  $ENTRY removed from .gitignore"
-  fi
+  for rel in "$@"; do
+    for entry in "/$rel/" "/$rel.meta"; do
+      if grep -qxF "$entry" "$PROJECT/.gitignore"; then
+        grep -vxF "$entry" "$PROJECT/.gitignore" \
+          | grep -vxF '# puer-exec suite: per-machine, default off' \
+          > "$PROJECT/.gitignore.tmp"
+        mv "$PROJECT/.gitignore.tmp" "$PROJECT/.gitignore"
+        echo "  ignore  $entry removed from .gitignore"
+      fi
+    done
+  done
 }
 
 write_markers() {
@@ -146,9 +159,13 @@ if [ -e "$TARGET" ]; then
   if [ "$FORCE" != 1 ]; then
     if [ "$ENABLE" = 1 ] || [ "$ENABLE_PROJECT" = 1 ]; then
       echo "  already installed; updating markers only"
+      add_ignore "$REL_TARGET"
       write_markers
       exit 0
     fi
+    echo "  already installed; verifying .gitignore"
+    add_ignore "$REL_TARGET"
+    exit 0
     echo "$TARGET already exists (use --update / --force / --remove)" >&2
     exit 2
   fi

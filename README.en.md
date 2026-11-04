@@ -57,6 +57,8 @@ Or use the script (writes the `.gitignore` entry, optionally opts this machine i
 ./install.sh /path/to/MyGame [--enable] [--enable-project] [--location packages]
 ```
 
+The installers also add two gitignore entries — the directory and the sibling `<directory>.meta` Unity creates for it, which lives *outside* the ignored directory. Ignore only the directory and `git status` keeps showing one untracked file forever.
+
 If `https://github.com` is blocked, use SSH or a mirror:
 
 ```bash

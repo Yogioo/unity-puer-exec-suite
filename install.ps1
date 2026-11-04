@@ -109,42 +109,76 @@ function Read-TextFile {
 }
 
 function Add-IgnoreEntry {
-    param([string]$Root, [string]$Relative)
+    param([string]$Root, [string[]]$Relatives)
     if ($NoIgnore) { return }
     $gitignore = Join-Path $Root '.gitignore'
-    $entry = '/' + $Relative.Trim('/') + '/'
-    $marker = '# puer-exec suite: per-machine, default off'
 
-    if (Test-Path -LiteralPath $gitignore) {
-        $existing = Read-TextFile -Path $gitignore
-        foreach ($line in ($existing.Text -split "`r?`n")) {
-            if ($line.Trim() -eq $entry) { return }
+    $wanted = @()
+    foreach ($relative in $Relatives) {
+        # A directory under Assets/ also gets a sibling "<name>.meta" that lives OUTSIDE
+        # the ignored directory, so the pair has to be ignored together.
+        $wanted += '/' + $relative.Trim('/') + '/'
+        $wanted += '/' + $relative.Trim('/') + '.meta'
+    }
+
+    $marker = '# puer-exec suite: per-machine, default off'
+    $existing = $null
+    if (Test-Path -LiteralPath $gitignore) { $existing = Read-TextFile -Path $gitignore }
+
+    $missing = @()
+    foreach ($entry in $wanted) {
+        $found = $false
+        if ($existing -ne $null) {
+            foreach ($line in ($existing.Text -split "`r?`n")) {
+                if ($line.Trim() -eq $entry) { $found = $true; break }
+            }
         }
-        $block = ''
+        if (-not $found) { $missing += $entry }
+    }
+
+    if ($missing.Count -eq 0) { return }
+
+    $block = ''
+    if ($existing -ne $null) {
+        $hasMarker = $false
+        foreach ($line in ($existing.Text -split "`r?`n")) {
+            if ($line.Trim() -eq $marker) { $hasMarker = $true; break }
+        }
         if ($existing.Text.Length -gt 0 -and -not $existing.Text.EndsWith("`n")) { $block += $existing.NewLine }
-        $block += $existing.NewLine + $marker + $existing.NewLine + $entry + $existing.NewLine
-        # Append only: never rewrite the file, so existing bytes and encoding survive.
+        if ($hasMarker) {
+            $block += ($missing -join $existing.NewLine) + $existing.NewLine
+        }
+        else {
+            $block += $existing.NewLine + $marker + $existing.NewLine + ($missing -join $existing.NewLine) + $existing.NewLine
+        }
         $writer = New-Object System.IO.StreamWriter($gitignore, $true, (New-Object System.Text.UTF8Encoding($false)))
         try { $writer.Write($block) } finally { $writer.Close() }
     }
     else {
-        [System.IO.File]::WriteAllText($gitignore, $marker + "`n" + $entry + "`n", (New-Object System.Text.UTF8Encoding($false)))
+        [System.IO.File]::WriteAllText($gitignore, $marker + "`n" + ($missing -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
     }
 
-    Write-Host "  ignore  $entry -> .gitignore"
+    foreach ($entry in $missing) { Write-Host "  ignore  $entry -> .gitignore" }
 }
 
 function Remove-IgnoreEntry {
-    param([string]$Root, [string]$Relative)
+    param([string]$Root, [string[]]$Relatives)
     $gitignore = Join-Path $Root '.gitignore'
     if (-not (Test-Path -LiteralPath $gitignore)) { return }
-    $entry = '/' + $Relative.Trim('/') + '/'
+
+    $doomed = @()
+    foreach ($relative in $Relatives) {
+        $doomed += '/' + $relative.Trim('/') + '/'
+        $doomed += '/' + $relative.Trim('/') + '.meta'
+    }
+
     $file = Read-TextFile -Path $gitignore
     $lines = @($file.Text -split "`r?`n")
     $kept = New-Object System.Collections.Generic.List[string]
     foreach ($line in $lines) {
-        if ($line.Trim() -eq $entry) { continue }
-        if ($line.Trim() -eq '# puer-exec suite: per-machine, default off') { continue }
+        $trimmed = $line.Trim()
+        if ($doomed -contains $trimmed) { continue }
+        if ($trimmed -eq '# puer-exec suite: per-machine, default off') { continue }
         $kept.Add($line)
     }
     while ($kept.Count -gt 0 -and $kept[$kept.Count - 1].Trim() -eq '') { $kept.RemoveAt($kept.Count - 1) }
@@ -152,7 +186,7 @@ function Remove-IgnoreEntry {
         $text = ($kept.ToArray() -join $file.NewLine) + $file.NewLine
         $encoding = if ($file.HasBom) { New-Object System.Text.UTF8Encoding($true) } else { New-Object System.Text.UTF8Encoding($false) }
         [System.IO.File]::WriteAllText($gitignore, $text, $encoding)
-        Write-Host "  ignore  $entry removed from .gitignore"
+        Write-Host "  ignore  cleaned for $($Relatives -join ', ')"
     }
 }
 
@@ -210,7 +244,7 @@ if ($Remove) {
         if (Test-Path -LiteralPath $path) {
             Remove-Item -LiteralPath $path -Recurse -Force
             Write-Host "  removed $rel"
-            Remove-IgnoreEntry -Root $root -Relative $rel
+            Remove-IgnoreEntry -Root $root -Relatives @($rel)
         }
     }
     if (Test-Path -LiteralPath $flag) {
@@ -250,9 +284,13 @@ if (Test-Path -LiteralPath $target) {
     if (-not $Force) {
         if ($Enable -or $EnableProject) {
             Write-Host '  already installed; updating markers only'
+            Add-IgnoreEntry -Root $root -Relatives @($relTarget)
             Write-Markers
             return
         }
+        Add-IgnoreEntry -Root $root -Relatives @($relTarget)
+        Write-Host '  already installed; .gitignore entries verified'
+        return
         throw "$target already exists. Use -Update to pull, -Force to reinstall, or -Remove to uninstall."
     }
     $resolved = (Resolve-Path -LiteralPath $target).ProviderPath
@@ -265,7 +303,7 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Nul
 Install-FromSource -From $Source -To $target
 Write-Host "  install $target"
 
-Add-IgnoreEntry -Root $root -Relative $relTarget
+Add-IgnoreEntry -Root $root -Relatives @($relTarget)
 
 Write-Markers
 

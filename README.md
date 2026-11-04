@@ -57,7 +57,7 @@ git clone https://github.com/Yogioo/unity-puer-exec-suite.git Assets/Editor/Puer
 ./install.sh /path/to/MyGame [--enable] [--enable-project] [--location packages]
 ```
 
-脚本还会做一件手 clone 不做的事：把安装路径写进工程 `.gitignore`，所以它天然不会进你的仓库。
+脚本还会做一件手 clone 不做的事：把安装路径写进工程 `.gitignore` —— 而且是**两条**：目录本身和它在 `Assets/Editor/` 下的同名 `.meta`（Unity 会给目录生成 meta，那个文件在模块目录外面，只 ignore 目录会留下一个永久未跟踪文件）。所以装完之后 `git status` 是干净的。
 
 > 国内网络打不开 `https://github.com` 时（`Connection was reset` / 超时），换 SSH 或镜像：
 >

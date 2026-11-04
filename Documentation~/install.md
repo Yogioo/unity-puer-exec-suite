@@ -25,11 +25,14 @@ git clone https://github.com/Yogioo/unity-puer-exec-suite.git Assets/Editor/Puer
 
 在工程根目录执行。Unity 会自动编译 `Assets/` 下的 asmdef，没有包清单需要登记。
 
-缺点只有一条：手 clone 不会替你写 `.gitignore`，自己加一行：
+缺点只有一条：手 clone 不会替你写 `.gitignore`，自己加**两行**：
 
 ```
 /Assets/Editor/PuerExecSuite/
+/Assets/Editor/PuerExecSuite.meta
 ```
+
+第二行容易被漏掉：Unity 会给**目录本身**生成一个同名 `.meta`，它落在 `Assets/Editor/` 下（模块目录的外面），只 ignore 目录盖不住它，于是 `git status` 会一直挂着一个未跟踪文件。装脚本会同时写这两行。
 
 ## 方式 A：安装脚本（推荐）
 
@@ -41,7 +44,7 @@ git clone https://github.com/Yogioo/unity-puer-exec-suite.git Assets/Editor/Puer
 ./install.sh /path/to/MyGame
 ```
 
-脚本做四件事：校验目标确实是 Unity 工程 → `git clone --depth 1` 到 `Assets/Editor/PuerExecSuite` → 往工程 `.gitignore` 追加安装路径（幂等）→ 打印 CLI 绝对路径与激活方式。
+脚本做四件事：校验目标确实是 Unity 工程 → `git clone --depth 1` 到 `Assets/Editor/PuerExecSuite` → 往工程 `.gitignore` 追加**目录 + 目录 meta 两行**（幂等，重复跑只会补齐缺失项）→ 打印 CLI 绝对路径与激活方式。
 
 | 参数 | 作用 |
 | --- | --- |
